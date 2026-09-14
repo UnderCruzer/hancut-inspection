@@ -1,0 +1,39 @@
+# ── 데이터 (AI Hub 재배포 제한 — 절대 커밋 금지) ──
+data/
+*.zip
+*.tar
+ml/runs/
+ml/outputs/
+
+# 이미지·모델 산출물
+*.jpg
+*.jpeg
+*.png
+!app/**/*.png
+!docs/**/*.png
+*.pt
+*.onnx
+*.tflite
+models/
+
+# 환경변수
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Flutter
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# 기타
+.DS_Store
+*.log
