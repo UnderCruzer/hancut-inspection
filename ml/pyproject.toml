@@ -1,0 +1,9 @@
+[project]
+name = "hancut-ml"
+version = "0.1.0"
+description = "한컷점검 — 데이터 준비, 평가 지표, 학습 실험"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
