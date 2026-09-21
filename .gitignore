@@ -1,5 +1,8 @@
 # ── 데이터 (AI Hub 재배포 제한 — 절대 커밋 금지) ──
-data/
+# 소스 폴더(ml/hancut/data)가 걸리지 않도록 경로를 명시한다
+/data/
+ml/data/
+server/data/
 *.zip
 *.tar
 ml/runs/
