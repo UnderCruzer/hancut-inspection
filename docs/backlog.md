@@ -8,7 +8,7 @@
 |------|------|------|
 | [#1](https://github.com/UnderCruzer/hancut-inspection/issues/1) | AI Hub 데이터 신청과 샘플 다운로드 | `data` `chore` |
 | [#2](https://github.com/UnderCruzer/hancut-inspection/issues/2) | 데이터 이용약관 확인 — 재배포·클라우드 조건 | `data` `docs` |
-| [#3](https://github.com/UnderCruzer/hancut-inspection/issues/3) | 팀 역할 확정과 협업 도구 개설 | `chore` |
+| [#3](https://github.com/UnderCruzer/hancut-inspection/issues/3) | 1인 작업 방식과 보드 준비 | `chore` `infra` |
 | [#4](https://github.com/UnderCruzer/hancut-inspection/issues/4) | GPU 자원 확인과 예산 상한 합의 | `infra` |
 
 ## W2 · 데이터와 평가 코드
@@ -33,9 +33,15 @@
 | `server/` | 판정 API — 모델 미탑재 시 503, 시설별 임계값 | 14 |
 | `app/` | Flutter 골격 — 판정 구간 규약 공유, 미지의 값은 '확인 필요' | 6 |
 
+## 나중에 결정할 것
+
+| 이슈 | 작업 |
+|------|------|
+| [#10](https://github.com/UnderCruzer/hancut-inspection/issues/10) | W13 선택 실험 하나 고르기 — E6 연한 OCR vs E5 점검표 초안 |
+
 ## 아직 없는 것
 
 - 라벨 파서 (#6) — 스키마 확인 전이라 추측으로 쓰지 않았다
 - 검출·판정 모델 — W3 이후
 - 촬영 화면과 정정 흐름 — W9–W10
-- OCR 연한 판정, 점검표 생성 — W11
+- OCR 연한 판정 **또는** 점검표 생성 — W13에 하나만 (#10)
