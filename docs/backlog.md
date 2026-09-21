@@ -1,26 +1,41 @@
 # W1–W2 백로그
 
-이슈로 옮길 작업 목록. 이슈 → 브랜치 → 구현 → PR 순서로 진행한다.
+이슈로 옮긴 상태다. 진행은 이슈 → 브랜치 → 구현 → PR 순서로 한다.
 
 ## W1 · 기반
 
-- [ ] AI Hub 가입·데이터 신청, 샘플 데이터 다운로드 — `docs`
-- [ ] 이용약관 확인 (재배포·클라우드 업로드) — `docs`
-- [ ] 팀 역할 확정, Jira 보드·Slack 채널 개설 — `chore`
-- [ ] GPU 자원 확인 (학교 실습실 / Colab) — `infra`
+| 이슈 | 작업 | 라벨 |
+|------|------|------|
+| [#1](https://github.com/UnderCruzer/hancut-inspection/issues/1) | AI Hub 데이터 신청과 샘플 다운로드 | `data` `chore` |
+| [#2](https://github.com/UnderCruzer/hancut-inspection/issues/2) | 데이터 이용약관 확인 — 재배포·클라우드 조건 | `data` `docs` |
+| [#3](https://github.com/UnderCruzer/hancut-inspection/issues/3) | 팀 역할 확정과 협업 도구 개설 | `chore` |
+| [#4](https://github.com/UnderCruzer/hancut-inspection/issues/4) | GPU 자원 확인과 예산 상한 합의 | `infra` |
 
 ## W2 · 데이터와 평가 코드
 
-- [ ] 샘플로 라벨 구조 확인 (`docs/data.md` W2 체크리스트) — `ml`
-- [ ] 라벨 JSON 파서 → 인덱스 CSV (`image_id, facility, compliant, source, reasons`) — `ml`
-- [ ] 8종 층화 서브셋 추출 실행, 서브셋 목록 커밋 — `ml`
-- [ ] 640px 축소 실행, 전후 용량 기록 — `ml`
-- [ ] 평가 스크립트: 모델 예측 CSV → `zones.sweep()` 결과 표 — `ml`
+| 이슈 | 작업 | 라벨 |
+|------|------|------|
+| [#5](https://github.com/UnderCruzer/hancut-inspection/issues/5) | 샘플 데이터로 라벨 구조 확인 | `data` `ai` |
+| [#6](https://github.com/UnderCruzer/hancut-inspection/issues/6) | 라벨 JSON 파서 — 인덱스 CSV 생성 | `ai` `feature` |
+| [#7](https://github.com/UnderCruzer/hancut-inspection/issues/7) | 8종 층화 서브셋 추출 실행 | `data` `ai` |
+| [#8](https://github.com/UnderCruzer/hancut-inspection/issues/8) | 640px 축소 실행과 용량 실측 | `data` `ai` |
+| [#9](https://github.com/UnderCruzer/hancut-inspection/issues/9) | 평가 스크립트 — 예측 CSV에서 E2 표 생성 | `ai` `qa` `feature` |
+
+**순서 주의** — #5가 선행 조건이다. 준수/미준수가 박스 단위인지 이미지 단위인지에 따라 #6의 파서 설계와 E1의 모델 구조가 갈린다. #6 → #7 → #8 순으로 이어진다. #9는 데이터와 무관하게 먼저 진행할 수 있다.
 
 ## 이미 준비된 것
 
-- `ml/hancut/eval/zones.py` — 판정 3구간, 놓침률 상한 기반 임계값 탐색 (E2)
-- `ml/hancut/data/subset.py` — 시설·준수 여부별 층화 추출
-- `ml/hancut/data/resize.py` — 640px 축소, 박스 좌표 변환
-- `server/` — 판정 API 골격 (모델 미탑재 시 503)
-- `app/` — Flutter 앱 골격
+| 모듈 | 내용 | 테스트 |
+|------|------|--------|
+| `ml/hancut/eval/zones.py` | 판정 3구간, 놓침률 상한 기반 임계값 탐색 (E2) | 23 |
+| `ml/hancut/data/subset.py` | 시설 × 준수 여부 층화 추출, 시드 재현, 부족 층 보고 | 11 |
+| `ml/hancut/data/resize.py` | 640px 축소, 박스 좌표 변환, 전후 용량 리포트 | 10 |
+| `server/` | 판정 API — 모델 미탑재 시 503, 시설별 임계값 | 14 |
+| `app/` | Flutter 골격 — 판정 구간 규약 공유, 미지의 값은 '확인 필요' | 6 |
+
+## 아직 없는 것
+
+- 라벨 파서 (#6) — 스키마 확인 전이라 추측으로 쓰지 않았다
+- 검출·판정 모델 — W3 이후
+- 촬영 화면과 정정 흐름 — W9–W10
+- OCR 연한 판정, 점검표 생성 — W11
