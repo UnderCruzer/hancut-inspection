@@ -1,0 +1,9 @@
+[project]
+name = "hancut-server"
+version = "0.1.0"
+description = "한컷점검 판정 API"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

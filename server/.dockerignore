@@ -1,0 +1,5 @@
+tests/
+models/
+.env
+__pycache__/
+.pytest_cache/
