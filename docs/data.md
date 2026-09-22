@@ -18,7 +18,7 @@ https://www.aihub.or.kr/aihubdata/data/view.do?dataSetSn=518
 
 1. AI Hub 로그인 → 데이터셋 페이지에서 다운로드 신청
 2. **샘플(경량) 데이터부터** 받아 아래 W2 확인 항목을 먼저 본다
-3. 승인 후 `aihubshell`로 1단계 8종 폴더만 선택해 받는다 — 전체를 받지 않는다
+3. 승인 및 이용 조건 확인 후 `aihubshell` 파일 목록에서 이미지/라벨을 선택한다. 8종별 선택 가능 여부는 파일 목록 확인 후 결정한다
 
 ```bash
 curl -o aihubshell https://api.aihub.or.kr/api/aihubshell.do && chmod +x aihubshell
@@ -45,3 +45,9 @@ AWS를 쓸 경우: 학습이 끝나면 인스턴스 중지, EBS는 중지해도 
 - [ ] 라벨 JSON 스키마 → `ml/hancut/data/`에 파서 작성
 
 라벨 파서는 스키마를 확인한 뒤 작성한다. 추측으로 먼저 쓰지 않는다.
+
+## 확보·이용 조건 확인 기록
+
+[2026-09-22 확인 결과](data-access-check.md)를 참조한다. 개인 승인 상태는 미확인이다.
+국외 반출에는 별도 합의가 필요하므로 기존 미국 리전 직접 다운로드 안내를 정정한다.
+약 6GB는 전처리 후 추정치이며 다운로드·압축해제 디스크 산정 기준이 아니다.
