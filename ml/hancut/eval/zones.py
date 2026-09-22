@@ -18,6 +18,7 @@ from __future__ import annotations
 규약: y_true 는 1 = 미준수, 0 = 준수. score 는 p(미준수).
 """
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
@@ -122,9 +123,9 @@ def fit_thresholds(
     high 가 작을수록 자동 처리되는 '미준수'가 늘고 오경보도 늘어난다.
     상한을 지킬 수 없으면 해당 구간을 비운다 (low=0 또는 high=1).
 
-    놓침률 상한이 우선이다. high 는 low 아래로 내려가지 않으므로, low 가 높게 잡히면
-    오경보 상한이 적용되지 않을 수 있다 (확인 필요 구간이 비어 버린다). 안전이 먼저이기
-    때문이며, 이 경우 `evaluate()` 의 false_alarm_rate 로 실제 값을 확인한다.
+    high를 높이면 오경보는 감소한다. 다만 high<=1 규약 때문에 준수 점수가
+    정확히 1이면 오경보 상한을 만족하지 못할 수 있다. 내보내기 전 evaluate()로
+    실제 상한 충족 여부를 확인한다. 후보별 누적 개수는 이진 탐색으로 계산한다.
     """
     _validate(y_true, scores)
     if not 0.0 <= max_miss_rate <= 1.0 or not 0.0 <= max_false_alarm_rate <= 1.0:
@@ -133,9 +134,12 @@ def fit_thresholds(
     n_non = sum(y_true)
     n_com = len(y_true) - n_non
 
+    non_scores = sorted(s for y, s in zip(y_true, scores) if y == 1)
+    com_scores = sorted(s for y, s in zip(y_true, scores) if y == 0)
+    candidates = _candidates(scores)
     low = 0.0
-    for candidate in _candidates(scores):
-        misses = sum(1 for y, s in zip(y_true, scores) if y == 1 and s < candidate)
+    for candidate in candidates:
+        misses = bisect_left(non_scores, candidate)
         miss_rate = misses / n_non if n_non else 0.0
         if miss_rate <= max_miss_rate:
             low = candidate
@@ -143,10 +147,10 @@ def fit_thresholds(
             break
 
     high = 1.0 + 1e-9
-    for candidate in reversed(_candidates(scores)):
+    for candidate in reversed(candidates):
         if candidate < low:
             break
-        false_alarms = sum(1 for y, s in zip(y_true, scores) if y == 0 and s >= candidate)
+        false_alarms = n_com - bisect_left(com_scores, candidate)
         rate = false_alarms / n_com if n_com else 0.0
         if rate <= max_false_alarm_rate:
             high = candidate
