@@ -1,40 +1,47 @@
-# 현재 데이터 — VisA
+# 현재 데이터 — Real-IAD 1024
 
-2026-09-24 전환. AI Hub 518은 현재 학습에 사용하지 않는다.
+2026-09-24 사용자 승인: 주 데이터는 Real-IAD의 realiad_1024 버전.
+AI Hub는 현 실험에서 사용하지 않으며 VisA는 보조 비교용으로 보관한다.
 
-- Amazon VisA: 12종 10,821장 (정상9,621 / 이상1,200), 이미지 라벨과 픽셀 마스크.
-- 1차 대상 pcb1: 정상1,004 / 이상100 (전체 수량이며 학습셋 수량 아님).
-- 데이터 CC BY 4.0. 출처·라이선스 링크·변경 사항 표기. 코드의 Apache-2.0과 구분.
-- 공식 파일 HEAD 확인: 1,929,840,640 bytes, 약1.93GB / 1.80GiB. 전체 12종 TAR이다.
-- 해제 후 용량은 미실측. 공간 확인 후 다운로드한다. AI Hub의 filekey/API key는 불필요.
+## 선택과 용량
 
-## AWS Ubuntu 터미널
+공식 안내: 1024×1024 버전 약53GB, 고해상도 raw 약507GB.
+53GB는 제공기관의 근사 안내다. 실제 파일별 합계 및 압축 해제 후 크기는 다운로드 전후 별도 확인한다.
+Hugging Face 저장소 전체 다운로드는 여러 버전까지 받을 수 있으므로 사용하지 않는다.
 
-```bash
-mkdir -p ~/hancut-data/visa
-cd ~/hancut-data/visa
-df -h .
-curl -fL --retry 3 -C - -o VisA_20220922.tar https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar
-```
+2026-09-24 공식 파일 목록 확인:
 
-다운로드 완료 후 확인:
+| realiad_1024 내부 파일 | 표시 크기 |
+|---|---:|
+| pcb.zip | 1.50GB |
+| audiojack.zip | 1.06GB |
+| usb.zip | 1.31GB |
+| switch.zip | 1.41GB |
 
-```bash
-stat -c %s VisA_20220922.tar
-tar -tf VisA_20220922.tar | head -30
-```
+PCB를 먼저 받아 로더를 검증하고, 위 4종(약5.28GB + 분할 JSON)을 초기 실험 후보로 삼는다.
+전체 데이터 수량을 이 4종 수량으로 오인하지 않는다. 제품별 정상/결함 및 독립 제품 수는 라벨 확보 후 집계해야 한다.
+realiad_jsons.zip의 분할 정보도 필요하다. 제품별 ZIP 내부 마스크·경로는 아직 읽지 않았다.
 
-예상 바이트 수와 일치 여부 확인 후 별도 폴더에 해제한다. 크기 일치는 암호학적 무결성 검증은 아니다.
-공식 TAR 내부 경로를 확인하기 전 시설별 폴더명을 추정해 이동하지 않는다.
-마스크·CSV·분할을 실제 확인한 후 로더/학습 명령을 작성한다. 아직 다운로드/학습 실행한 것은 아니다.
+## 이용 및 다운로드 순서
 
-## 출처 및 발표 표기
+1. https://huggingface.co/datasets/Real-IAD/Real-IAD 에 로그인.
+2. 연구 목적 및 연락처 공유/이용 조건을 읽고 본인이 동의하여 접근 요청. 공식 안내는 자동 승인이나 실제 계정 상태는 미확인.
+3. AWS에서 접근 가능한 계정으로 인증 후 realiad_1024/pcb.zip과 분할 JSON만 선택 다운로드.
+4. 여유 디스크 확인, ZIP 해제 용량/마스크/분할 확인 후 범위 확대.
 
-Amazon Science, VisA; Zou et al., SPot-the-Difference Self-Supervised Pre-training for Anomaly Detection and Segmentation (ECCV 2022).
-변경 사항(리사이즈, 자체 분할 등)을 실험별로 함께 기록한다.
+공식 데이터 카드는 CC BY-NC-SA 4.0 및 연구 목적 전용을 명시한다. 출처·라이선스·변경 사항을 기록한다.
+원본/모델/인증 토큰은 Git에 넣지 않는다. 원시 고해상도 전체를 다운로드하지 않는다.
 
-- https://github.com/amazon-science/spot-diff
-- https://registry.opendata.aws/visa/
-- https://creativecommons.org/licenses/by/4.0/
+## 평가 시 주의
 
-AI Hub 이용 기록과 이전 용량은 archive-aihub/data.md 및 data-access-check.md에 남긴다.
+동일 제품의 5개 시점이 학습/검증/시험에 흩어지지 않도록 제품 ID로 묶는다.
+사진 수와 독립 제품 수를 따로 집계한다. 1024 파일 사용은 모델 입력도 반드시1024여야 한다는 뜻은 아니다.
+미세 결함 손실을 피하기 위해 마스크로 실제 크기를 보고 모델 입력 크기/타일 사용을 결정한다.
+학습·검증·시험 역할과 점수 보정은 실험 프로토콜에 기록하고 시험 데이터로 임계값을 선택하지 않는다.
+
+## 출처
+
+- https://realiad4ad.github.io/Real-IAD/
+- https://huggingface.co/datasets/Real-IAD/Real-IAD
+- https://huggingface.co/datasets/Real-IAD/Real-IAD/tree/main/realiad_1024
+- Wang et al., Real-IAD: A Real-World Multi-View Dataset for Benchmarking Versatile Industrial Anomaly Detection, CVPR 2024.

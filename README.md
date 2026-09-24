@@ -1,4 +1,4 @@
-> **2026-09-24 전환:** 현재 주제는 VisA 기반 PCB 검수 AX **한컷검수**입니다. [현재 계획](docs/plan.md) · [데이터/AWS 다운로드](docs/data.md) · [Windows 인수인계](docs/windows-handoff.md). 아래 소방시설 소개는 기존 구현 배경이며 코드 전환은 진행 예정입니다.
+> **2026-09-24 전환:** 현재 주제는 Real-IAD 1024 기반 제품 검수 AX **한컷검수**입니다. [현재 계획](docs/plan.md) · [데이터/AWS 다운로드](docs/data.md) · [Windows 인수인계](docs/windows-handoff.md). 아래 소방시설 소개는 기존 구현 배경이며 코드 전환은 진행 예정입니다.
 
 # 한컷점검 (hancut-inspection)
 
