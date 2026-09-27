@@ -47,7 +47,6 @@
 | `ml/hancut/eval/zones.py` | 판정 3구간, 놓침률 상한 기반 임계값 탐색 (E2·E3·E4) | 23 |
 | `ml/hancut/eval/cli.py` | 예측 CSV → 구간 표 + 임계값 JSON | 25 |
 | `ml/hancut/data/subset.py` | 층화 추출, 시드 재현, 부족 층 보고 | 11 |
-| `ml/hancut/data/resize.py` | 축소와 박스 좌표 변환 | 10 |
 | `ml/configs/items.json` | 위해물품 12종, phase 1은 PIDray∩SIXray 5종 | — |
 | `server/` | 판정 API — 모델 미탑재 시 503 | 14 |
 | `app/` | Flutter 골격 — 미지의 판정 값은 '확인 필요'로 | 6 |

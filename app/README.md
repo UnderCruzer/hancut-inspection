@@ -1,6 +1,6 @@
 # hancut
 
-한컷점검 — 소방시설 점검 앱
+한컷점검 — 보안검색 X-ray 판독 보조 앱
 
 ## Getting Started
 
