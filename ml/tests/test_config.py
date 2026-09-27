@@ -57,3 +57,42 @@ def test_device_metadata_is_recorded_as_absent():
 
     devices = json.loads((CONFIG_DIR / "items.json").read_text(encoding="utf-8"))["devices"]
     assert devices["available"] is False
+import json
+from hancut.config import CONFIG_DIR, load_items
+
+
+def _cfg():
+    return json.loads((CONFIG_DIR / "items.json").read_text(encoding="utf-8"))
+
+
+def test_every_item_can_measure_the_one_percent_cap():
+    # 1% 가 주 격자의 가장 낮은 상한이다. 한 품목이라도 못 재면 격자를 다시 짜야 한다.
+    assert all(i["reliable_min_miss_rate"] <= 0.012 for i in load_items())
+
+
+def test_the_tightest_item_is_baton():
+    worst = max(load_items(), key=lambda i: i["reliable_min_miss_rate"])
+    assert worst["dataset_name"] == "Baton"
+
+
+def test_positives_sum_to_the_split_sizes():
+    cfg = _cfg()
+    items = cfg["items"]
+    for split, per_image in [("test_easy", 1.0), ("test_hidden", 1.0)]:
+        total = sum(i["positives"][split] for i in items)
+        # easy 와 hidden 은 이미지당 정확히 1종이므로 양성 합계 = 이미지 수
+        assert total == cfg["splits"][split]
+
+
+def test_hard_is_the_only_split_with_multiple_items_per_image():
+    cfg = _cfg()
+    hard = sum(i["positives"]["test_hard"] for i in cfg["items"])
+    assert hard > cfg["splits"]["test_hard"]
+    assert round(hard / cfg["splits"]["test_hard"], 2) == 2.08
+
+
+def test_primary_caps_do_not_include_an_unmeasurable_one():
+    caps = _cfg()["miss_rate_caps"]["primary"]
+    floor = max(i["reliable_min_miss_rate"] for i in load_items())
+    assert min(caps) >= floor - 0.002  # Baton 1.17% 로 1% 는 빠듯하지만 성립
+    assert 0.001 not in caps           # 0.1% 는 어느 품목도 불가
