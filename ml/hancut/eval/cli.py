@@ -126,14 +126,20 @@ def run(args):
     return targets
 
 
-def main(argv=None):
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv", type=Path, help="검증셋 예측 CSV (학습/시험셋 사용 금지)")
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--miss-caps", nargs="+", type=rate, default=[0.01, 0.03, 0.05])
+    # D12: 측정 가능한 범위에서 정한 격자. ml/configs/items.json 의 miss_rate_caps.primary 와 같아야 한다.
+    parser.add_argument("--miss-caps", nargs="+", type=rate, default=[0.01, 0.02, 0.05])
     parser.add_argument("--select-cap", type=rate, default=0.01)
     parser.add_argument("--false-alarm-cap", type=rate, default=0.05)
     parser.add_argument("--test-csv", type=Path)
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
     args = parser.parse_args(argv)
     try:
         paths = run(args)

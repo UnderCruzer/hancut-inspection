@@ -144,3 +144,17 @@ class TestSweep:
         table = zones.format_table(zones.sweep(y, s))
         assert table.count("\n") == 4  # 헤더 + 구분선 + 상한 3개
         assert "놓침률 상한" in table
+
+
+def test_default_caps_match_the_grid_recorded_in_items_json():
+    # D12: 측정 가능한 범위에서 정한 격자. 코드 기본값과 설정이 어긋나면 옵션 없이 돌렸을 때 다른 상한이 나온다.
+    import inspect
+    import json
+
+    from hancut.config import CONFIG_DIR
+    from hancut.eval import cli
+
+    grid = sorted(json.loads((CONFIG_DIR / "items.json").read_text(encoding="utf-8"))["miss_rate_caps"]["primary"])
+    assert sorted(inspect.signature(zones.sweep).parameters["miss_rate_caps"].default) == grid
+    assert sorted(inspect.signature(zones.sweep_by_item).parameters["miss_rate_caps"].default) == grid
+    assert sorted(cli.build_parser().get_default("miss_caps")) == grid

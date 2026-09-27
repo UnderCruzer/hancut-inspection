@@ -163,7 +163,7 @@ def fit_thresholds(
 def sweep(
     y_true: Sequence[int],
     scores: Sequence[float],
-    miss_rate_caps: Sequence[float] = (0.01, 0.03, 0.05),
+    miss_rate_caps: Sequence[float] = (0.01, 0.02, 0.05),
     max_false_alarm_rate: float = 0.05,
 ) -> list[dict]:
     """놓침률 상한별 운영점 — E2 결과 표의 한 행씩."""
@@ -179,7 +179,7 @@ def sweep_by_item(
     items: Sequence[str],
     y_true: Sequence[int],
     scores: Sequence[float],
-    miss_rate_caps: Sequence[float] = (0.01, 0.03, 0.05),
+    miss_rate_caps: Sequence[float] = (0.01, 0.02, 0.05),
     max_false_alarm_rate: float = 0.05,
 ) -> dict[str, list[dict]]:
     """품목별로 따로 계산한다 — 총기와 라이터는 같은 임계값을 쓰지 않는다."""
