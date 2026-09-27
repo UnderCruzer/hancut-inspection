@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """PIDray 어노테이션 → 품목 단위 이진 인덱스 CSV (#6).
 
-    python3 ml/scripts/build_index.py data/pidray/pidray/annotations data/index.csv
+    python3 ml/scripts/build_index.py
+    python3 ml/scripts/build_index.py <어노테이션_폴더> <출력_csv>
+
+인자를 생략하면 저장소의 data/ 아래에서 어노테이션 폴더를 찾고 data/index.csv 로 쓴다.
 
 세 가지를 함께 한다.
   1. 인덱스 생성 — 이미지 x 품목 행
@@ -41,11 +44,34 @@ def cross_check(summary: list[dict]) -> list[str]:
     return problems
 
 
+REPO = Path(__file__).resolve().parents[2]
+CANDIDATES = (
+    REPO / "data" / "pidray" / "pidray" / "annotations",  # zip 안에 pidray/ 가 한 겹 더 있는 경우
+    REPO / "data" / "pidray" / "annotations",
+)
+
+
+def default_annotations_dir() -> Path | None:
+    return next((c for c in CANDIDATES if (c / "xray_train.json").is_file()), None)
+
+
 def main() -> int:
-    if len(sys.argv) != 3:
+    args = sys.argv[1:]
+    if len(args) == 2:
+        annotations_dir, out_path = Path(args[0]), Path(args[1])
+    elif not args:
+        annotations_dir = default_annotations_dir()
+        out_path = REPO / "data" / "index.csv"
+        if annotations_dir is None:
+            print("어노테이션 폴더를 찾지 못했다. 다음 위치를 봤다:")
+            for c in CANDIDATES:
+                print(f"  - {c}")
+            print("\n경로를 직접 주려면: python3 ml/scripts/build_index.py <어노테이션_폴더> <출력_csv>")
+            return 2
+    else:
+        print(f"인자는 0개 또는 2개여야 한다. 받은 인자 {len(args)}개: {args}")
         print(__doc__)
         return 2
-    annotations_dir, out_path = Path(sys.argv[1]), Path(sys.argv[2])
 
     print(f"# 인덱스 생성\n\n어노테이션: `{annotations_dir}`")
     rows = pidray.build_index(annotations_dir)
