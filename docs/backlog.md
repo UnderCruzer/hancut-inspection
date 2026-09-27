@@ -21,7 +21,7 @@
 | [#6](https://github.com/UnderCruzer/hancut-inspection/issues/6) | PIDray 라벨 로더 — 인덱스 CSV | `ai` `feature` | 열림 |
 | [#7](https://github.com/UnderCruzer/hancut-inspection/issues/7) | ~~SIXray 층화 서브셋~~ | `data` `ai` | **닫힘 — 확보 불가** |
 | [#9](https://github.com/UnderCruzer/hancut-inspection/issues/9) | 평가 스크립트 — 예측 CSV에서 E2 표 | `ai` `qa` `feature` | PR #11 |
-| [#13](https://github.com/UnderCruzer/hancut-inspection/issues/13) | `facility` → `item` 리네임 | `chore` `ai` `backend` `mobile` | 열림 |
+| [#13](https://github.com/UnderCruzer/hancut-inspection/issues/13) | `facility` → `item` 리네임 | `chore` `ai` `backend` `mobile` | 진행 중 |
 
 **순서 주의** — #14 → #5 → #6 → #7. #5가 선행 조건이다.
 박스 점수를 이미지 한 장의 점수로 어떻게 바꾸느냐(E1)가 여기서 갈리고, 그게 틀리면 E2 이후가 전부 무의미해진다.
@@ -49,7 +49,7 @@
 | `ml/hancut/data/subset.py` | 층화 추출, 시드 재현, 부족 층 보고 | 11 |
 | `ml/configs/items.json` | 위해물품 12종, phase 1은 PIDray∩SIXray 5종 | — |
 | `server/` | 판정 API — 모델 미탑재 시 503 | 14 |
-| `app/` | Flutter 골격 — 미지의 판정 값은 '확인 필요'로 | 6 |
+| `app/` | Flutter 골격 — 미지의 판정 값은 '재검'으로 | 6 |
 
 ## 아직 없는 것
 
