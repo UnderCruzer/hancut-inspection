@@ -34,8 +34,13 @@ def human(n: int) -> str:
     return f"{n:.1f}GB"
 
 
+def is_junk(p: Path) -> bool:
+    """맥에서 압축하면 __MACOSX/ 와 ._ 접두사 파일이 섞여 들어온다. 실제 데이터가 아니다."""
+    return "__MACOSX" in p.parts or p.name.startswith("._") or p.name == ".DS_Store"
+
+
 def walk(root: Path) -> list[Path]:
-    return sorted((p for p in root.rglob("*") if p.is_file()), key=str)
+    return sorted((p for p in root.rglob("*") if p.is_file() and not is_junk(p)), key=str)
 
 
 def section(title: str) -> None:
@@ -49,8 +54,10 @@ def report_tree(root: Path, depth: int = 2) -> None:
         rel = p.relative_to(root)
         if len(rel.parts) > depth:
             continue
-        if p.is_dir():
-            files = [f for f in p.rglob("*") if f.is_file()]
+        if p.is_dir() and not is_junk(p) and "__MACOSX" not in rel.parts:
+            files = [f for f in p.rglob("*") if f.is_file() and not is_junk(f)]
+            if not files:
+                continue
             entries.append((str(rel) + "/", len(files), sum(f.stat().st_size for f in files)))
     if not entries:
         print("_하위 디렉터리 없음_")
@@ -164,6 +171,59 @@ def report_annotations(files: list[Path], root: Path) -> None:
             print(f"리스트, 길이 {len(data):,}. 첫 항목: `{json.dumps(data[0], ensure_ascii=False)[:300]}`")
 
 
+def report_positives(files: list[Path], root: Path) -> None:
+    """품목별 양성 이미지 수. E2 에서 측정 가능한 최소 놓침률을 결정한다."""
+    section("5. 품목별 양성 장수 (E2 측정 한계)")
+    jsons = [f for f in files if f.suffix.lower() == ".json"]
+    if not jsons:
+        print("어노테이션 JSON 이 없다.")
+        return
+
+    rows: dict[str, dict[str, int]] = {}
+    totals: Counter[str] = Counter()
+    for f in sorted(jsons):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict) or "categories" not in data:
+            continue
+        names = {c["id"]: c["name"] for c in data["categories"] if isinstance(c, dict)}
+        n_images = len(data.get("images") or [])
+        per_item: dict[str, set] = {}
+        for a in data.get("annotations") or []:
+            if not isinstance(a, dict):
+                continue
+            name = names.get(a.get("category_id"))
+            if name is None:
+                continue
+            per_item.setdefault(name, set()).add(a.get("image_id"))
+        split = f.stem.replace("xray_", "")
+        rows[split] = {k: len(v) for k, v in per_item.items()}
+        rows[split]["(전체 이미지)"] = n_images
+        for k, v in per_item.items():
+            totals[k] += len(v)
+
+    if not rows:
+        print("categories 를 가진 JSON 이 없다.")
+        return
+
+    splits = list(rows)
+    items = sorted(totals, key=lambda k: -totals[k])
+    print("품목이 **하나 이상 들어 있는 이미지 수**다. 한 이미지에 여러 품목이 있으면 각각 세어진다.\n")
+    print("| 품목 | " + " | ".join(splits) + " | 합계 | 측정 가능한 최소 놓침률 |")
+    print("|---|" + "---:|" * (len(splits) + 2))
+    for name in items:
+        cells = " | ".join(f"{rows[s].get(name, 0):,}" for s in splits)
+        test_pos = sum(rows[s].get(name, 0) for s in splits if s != "train")
+        floor = f"{1 / test_pos:.2%}" if test_pos else "측정 불가"
+        print(f"| {name} | {cells} | {totals[name]:,} | {floor} |")
+    cells = " | ".join(f"{rows[s].get('(전체 이미지)', 0):,}" for s in splits)
+    print(f"| _(전체 이미지)_ | {cells} | | |")
+    print("\n**측정 가능한 최소 놓침률** = 시험셋 양성 1장을 놓쳤을 때의 값이다. "
+          "그보다 낮은 상한은 이 데이터로 검증할 수 없다. E2 표에 '측정 불가'로 적는다.")
+
+
 def report_filenames(files: list[Path]) -> None:
     section("파일명 규칙")
     images = [f for f in files if f.suffix.lower() in IMAGE_EXT]
@@ -196,11 +256,19 @@ def main() -> int:
     total_size = sum(f.stat().st_size for f in files)
     print(f"파일 {len(files):,}개, 합계 {human(total_size)}")
 
+    junk = [p for p in root.rglob("*") if p.is_file() and is_junk(p)]
+    if junk:
+        print(f"\n맥 압축 부산물 **{len(junk):,}개**를 세지 않았다 "
+              f"(`__MACOSX/`, `._*`, `.DS_Store`). 실제 데이터가 아니다.")
+        print("\n```bash\nrm -rf <데이터폴더>/__MACOSX && "
+              "find <데이터폴더> -name '._*' -delete\n```")
+
     report_tree(root)
     report_extensions(files)
     report_edition(files)
     report_difficulty(files)
     report_annotations(files, root)
+    report_positives(files, root)
     report_filenames(files)
 
     section("다음")
