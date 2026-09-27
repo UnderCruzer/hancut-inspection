@@ -19,7 +19,7 @@ ml/runs/2026-10-05_e1_two-stage/
   config.json      모델·입력 크기·에폭·시드 등 전부
   metrics.json     zones.sweep() 결과
   report.md        무엇을 바꿨고 무엇이 달라졌는지 3~5줄
-  predictions.csv  image_id,facility,y_true,score
+  predictions.csv  image_id,item,y_true,score
 ```
 
 `ml/runs/`는 `.gitignore` 대상이다. 저장소에는 `report.md`의 내용을 실험 이슈에 옮겨 적는다.
@@ -67,7 +67,7 @@ ml/runs/2026-10-05_e1_two-stage/
 
 ## E2 평가 CLI (#9)
 
-저장소 루트에서 실행한다. CSV 필수 열은 `image_id,facility,y_true,score`이며,
+저장소 루트에서 실행한다. CSV 필수 열은 `image_id,item,y_true,score`이며,
 `y_true=1`이 미준수, `score`는 0~1의 미준수 확률이다. 한 이미지당 한 행만 받는다.
 객체별 예측은 #5에서 평가 단위를 정한 후 별도 확장한다. 시설명 `default`는 예약어다.
 

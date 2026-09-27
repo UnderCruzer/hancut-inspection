@@ -14,14 +14,14 @@ def _perfect(n=100):
 class TestZoneOf:
     def test_three_zones_by_threshold(self):
         t = Thresholds(low=0.2, high=0.8)
-        assert zones.zone_of(0.1, t) == zones.AUTO_COMPLIANT
+        assert zones.zone_of(0.1, t) == zones.AUTO_CLEAR
         assert zones.zone_of(0.5, t) == zones.REVIEW
-        assert zones.zone_of(0.9, t) == zones.AUTO_NONCOMPLIANT
+        assert zones.zone_of(0.9, t) == zones.AUTO_ALARM
 
     def test_boundaries_are_low_inclusive_high_inclusive(self):
         t = Thresholds(low=0.2, high=0.8)
         assert zones.zone_of(0.2, t) == zones.REVIEW
-        assert zones.zone_of(0.8, t) == zones.AUTO_NONCOMPLIANT
+        assert zones.zone_of(0.8, t) == zones.AUTO_ALARM
 
     def test_thresholds_must_be_ordered(self):
         with pytest.raises(ValueError):
@@ -37,14 +37,14 @@ class TestEvaluate:
         assert point.false_alarm_rate == 0.0
         assert point.auto_rate == 1.0
 
-    def test_miss_rate_counts_noncompliant_sent_to_auto_compliant(self):
+    def test_miss_rate_counts_threat_sent_to_auto_clear(self):
         y = [1, 1, 1, 1, 0]
         s = [0.1, 0.9, 0.9, 0.9, 0.1]  # 미준수 1건이 낮은 점수
         point = zones.evaluate(y, s, Thresholds(low=0.5, high=0.8))
         assert point.miss_rate == 0.25
-        assert point.n_noncompliant == 4
+        assert point.n_threat == 4
 
-    def test_false_alarm_rate_is_over_compliant_items_only(self):
+    def test_false_alarm_rate_is_over_clear_items_only(self):
         y = [0, 0, 1]
         s = [0.95, 0.1, 0.95]
         point = zones.evaluate(y, s, Thresholds(low=0.2, high=0.9))
@@ -126,18 +126,18 @@ class TestSweep:
         for row in rows:
             assert row["miss_rate"] <= row["miss_rate_cap"] + 1e-9
 
-    def test_by_facility_groups_independently(self):
-        facilities = ["방화문", "방화문", "통로유도등", "통로유도등"]
+    def test_by_item_groups_independently(self):
+        items = ["방화문", "방화문", "통로유도등", "통로유도등"]
         y = [1, 0, 1, 0]
         s = [0.6, 0.4, 0.99, 0.01]
-        result = zones.sweep_by_facility(facilities, y, s, miss_rate_caps=(0.0,))
+        result = zones.sweep_by_item(items, y, s, miss_rate_caps=(0.0,))
         assert set(result) == {"방화문", "통로유도등"}
         # 잘 분리된 통로유도등이 방화문보다 확인 필요 비율이 낮다
         assert result["통로유도등"][0]["review_rate"] <= result["방화문"][0]["review_rate"]
 
-    def test_by_facility_rejects_length_mismatch(self):
+    def test_by_item_rejects_length_mismatch(self):
         with pytest.raises(ValueError):
-            zones.sweep_by_facility(["방화문"], [1, 0], [0.5, 0.5])
+            zones.sweep_by_item(["방화문"], [1, 0], [0.5, 0.5])
 
     def test_format_table_renders_every_row(self):
         y, s = _perfect(10)

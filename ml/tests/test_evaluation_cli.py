@@ -10,7 +10,7 @@ from hancut.eval.cli import main, read_predictions
 from hancut.eval.zones import Thresholds, zone_of
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = 'image_id,facility,y_true,score\n'
+HEADER = 'image_id,item,y_true,score\n'
 VALID = HEADER + 'a,소화기,0,0.123456789\nb,소화기,1,0.876543219\nc,방화문,0,0.2\nd,방화문,1,0.8\n'
 
 
@@ -41,13 +41,13 @@ def test_cli_exports_full_precision_server_compatible_thresholds(tmp_path):
 
 
 @pytest.mark.parametrize('content', [
-    '', HEADER, 'image_id,facility,y_true\na,x,1\n',
+    '', HEADER, 'image_id,item,y_true\na,x,1\n',
     HEADER + 'a,x,1,nan\n', HEADER + 'a,x,1,inf\n', HEADER + 'a,x,1,-0.1\n',
     HEADER + 'a,x,1,1.1\n', HEADER + 'a,x,2,0.5\n', HEADER + 'a,x,1,no\n',
     HEADER + ',x,1,0.5\n', HEADER + 'a,,1,0.5\n', HEADER + 'a,default,1,0.5\n',
     HEADER + 'a,x,1\n', HEADER + 'a,x,1,0.5,extra\n',
     HEADER + 'a,x,1,0.5\na,y,0,0.4\n',
-    'image_id,facility,y_true,score,score\na,x,1,0.5,0.5\n',
+    'image_id,item,y_true,score,score\na,x,1,0.5,0.5\n',
 ])
 def test_rejects_bad_csv(tmp_path, content):
     with pytest.raises(ValueError):
@@ -64,7 +64,7 @@ def test_unreliable_thresholds_not_exported(tmp_path, content):
     assert not output.exists()
 
 
-def test_holdout_uses_frozen_thresholds_and_unknown_facility_fallback(tmp_path):
+def test_holdout_uses_frozen_thresholds_and_unknown_item_fallback(tmp_path):
     validation = write_csv(tmp_path)
     test = write_csv(tmp_path, HEADER + 'e,소화기,1,0.01\nf,새시설,0,0.99\n', 'test.csv')
     out = tmp_path / 'out'
@@ -73,7 +73,7 @@ def test_holdout_uses_frozen_thresholds_and_unknown_facility_fallback(tmp_path):
     assert metrics['test']['전체']['miss_rate'] == 1
     assert metrics['test']['전체']['false_alarm_rate'] == 1
     assert metrics['test']['소화기']['false_alarm_rate'] is None
-    assert metrics['test_default_facilities'] == ['새시설']
+    assert metrics['test_default_items'] == ['새시설']
 
 
 def test_rejects_overlap_and_overwrite(tmp_path):

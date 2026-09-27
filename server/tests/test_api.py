@@ -13,9 +13,9 @@ from app.predictor import Prediction
 class FakePredictor:
     model_version = "fake-0.1"
 
-    def __init__(self, score=0.9, facility="소형소화기", reasons=("부식",)):
+    def __init__(self, score=0.9, item="소형소화기", reasons=("부식",)):
         self._prediction = Prediction(
-            facility=facility, score=score, reasons=list(reasons), model_version=self.model_version
+            item=item, score=score, reasons=list(reasons), model_version=self.model_version
         )
 
     def predict(self, image_bytes: bytes) -> Prediction:
@@ -64,11 +64,11 @@ class TestJudge:
         response = _upload(_client(tmp_path))
         assert response.status_code == 503
 
-    def test_high_score_is_auto_noncompliant(self, tmp_path):
+    def test_high_score_is_auto_alarm(self, tmp_path):
         response = _upload(_client(tmp_path, FakePredictor(score=0.95)))
         body = response.json()
         assert response.status_code == 200
-        assert body["zone"] == judgment.AUTO_NONCOMPLIANT
+        assert body["zone"] == judgment.AUTO_ALARM
         assert body["needs_review"] is False
         assert body["reasons"] == ["부식"]
         assert body["model_version"] == "fake-0.1"
@@ -78,13 +78,13 @@ class TestJudge:
         assert body["zone"] == judgment.REVIEW
         assert body["needs_review"] is True
 
-    def test_low_score_is_auto_compliant(self, tmp_path):
+    def test_low_score_is_auto_clear(self, tmp_path):
         body = _upload(_client(tmp_path, FakePredictor(score=0.01))).json()
-        assert body["zone"] == judgment.AUTO_COMPLIANT
+        assert body["zone"] == judgment.AUTO_CLEAR
 
-    def test_facility_specific_thresholds_are_used(self, tmp_path):
+    def test_item_specific_thresholds_are_used(self, tmp_path):
         # 방화문은 low=0.05 — 같은 점수라도 기본 임계값(0.2)과 결과가 다르다
-        body = _upload(_client(tmp_path, FakePredictor(score=0.1, facility="방화문"))).json()
+        body = _upload(_client(tmp_path, FakePredictor(score=0.1, item="방화문"))).json()
         assert body["zone"] == judgment.REVIEW
         assert body["thresholds"] == {"low": 0.05, "high": 0.6}
 
@@ -115,9 +115,9 @@ class TestThresholds:
 
     def test_zone_boundaries_match_the_ml_convention(self):
         t = judgment.Thresholds(low=0.2, high=0.8)
-        assert judgment.zone_of(0.199, t) == judgment.AUTO_COMPLIANT
+        assert judgment.zone_of(0.199, t) == judgment.AUTO_CLEAR
         assert judgment.zone_of(0.2, t) == judgment.REVIEW
-        assert judgment.zone_of(0.8, t) == judgment.AUTO_NONCOMPLIANT
+        assert judgment.zone_of(0.8, t) == judgment.AUTO_ALARM
 
     def test_rejects_score_outside_range(self):
         with pytest.raises(ValueError):

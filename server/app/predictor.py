@@ -13,7 +13,7 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class Prediction:
-    facility: str
+    item: str
     score: float                       # p(미준수)
     reasons: list[str] = field(default_factory=list)
     model_version: str = "unknown"

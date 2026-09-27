@@ -22,9 +22,9 @@ from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-AUTO_COMPLIANT = "auto_compliant"
+AUTO_CLEAR = "auto_clear"
 REVIEW = "review"
-AUTO_NONCOMPLIANT = "auto_noncompliant"
+AUTO_ALARM = "auto_alarm"
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class OperatingPoint:
     false_alarm_rate: float   # 준수 중 '자동 · 미준수'로 잡힌 비율
     auto_rate: float          # 자동 처리 비율 (1 - review_rate)
     n: int
-    n_noncompliant: int
+    n_threat: int
 
     def as_row(self) -> dict:
         return {
@@ -56,15 +56,15 @@ class OperatingPoint:
             "false_alarm_rate": round(self.false_alarm_rate, 4),
             "auto_rate": round(self.auto_rate, 4),
             "n": self.n,
-            "n_noncompliant": self.n_noncompliant,
+            "n_threat": self.n_threat,
         }
 
 
 def zone_of(score: float, thresholds: Thresholds) -> str:
     if score < thresholds.low:
-        return AUTO_COMPLIANT
+        return AUTO_CLEAR
     if score >= thresholds.high:
-        return AUTO_NONCOMPLIANT
+        return AUTO_ALARM
     return REVIEW
 
 
@@ -101,7 +101,7 @@ def evaluate(y_true: Sequence[int], scores: Sequence[float], thresholds: Thresho
         false_alarm_rate=false_alarms / n_com if n_com else 0.0,
         auto_rate=1.0 - reviews / n,
         n=n,
-        n_noncompliant=n_non,
+        n_threat=n_non,
     )
 
 
@@ -175,26 +175,26 @@ def sweep(
     return rows
 
 
-def sweep_by_facility(
-    facilities: Sequence[str],
+def sweep_by_item(
+    items: Sequence[str],
     y_true: Sequence[int],
     scores: Sequence[float],
     miss_rate_caps: Sequence[float] = (0.01, 0.03, 0.05),
     max_false_alarm_rate: float = 0.05,
 ) -> dict[str, list[dict]]:
     """시설 종류별로 따로 계산한다 — 방화문과 유도등은 같은 임계값을 쓰지 않는다."""
-    if not (len(facilities) == len(y_true) == len(scores)):
-        raise ValueError("facilities, y_true, scores 의 길이가 모두 같아야 한다")
+    if not (len(items) == len(y_true) == len(scores)):
+        raise ValueError("items, y_true, scores 의 길이가 모두 같아야 한다")
 
     grouped: dict[str, tuple[list[int], list[float]]] = {}
-    for facility, y, s in zip(facilities, y_true, scores):
-        ys, ss = grouped.setdefault(facility, ([], []))
+    for item, y, s in zip(items, y_true, scores):
+        ys, ss = grouped.setdefault(item, ([], []))
         ys.append(y)
         ss.append(s)
 
     return {
-        facility: sweep(ys, ss, miss_rate_caps, max_false_alarm_rate)
-        for facility, (ys, ss) in sorted(grouped.items())
+        item: sweep(ys, ss, miss_rate_caps, max_false_alarm_rate)
+        for item, (ys, ss) in sorted(grouped.items())
     }
 
 

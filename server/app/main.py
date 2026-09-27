@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 class JudgmentResponse(BaseModel):
-    facility: str
+    item: str
     score: float
     zone: str
     needs_review: bool
@@ -64,11 +64,11 @@ async def judge(request: Request, image: UploadFile = File(...)) -> JudgmentResp
         raise HTTPException(status_code=413, detail=f"파일이 너무 크다 (최대 {MAX_UPLOAD_BYTES} bytes)")
 
     prediction = predictor.predict(payload)
-    table = judgment.thresholds_for(thresholds, prediction.facility)
+    table = judgment.thresholds_for(thresholds, prediction.item)
     zone = judgment.zone_of(prediction.score, table)
 
     return JudgmentResponse(
-        facility=prediction.facility,
+        item=prediction.item,
         score=round(prediction.score, 4),
         zone=zone,
         needs_review=judgment.needs_review(zone),

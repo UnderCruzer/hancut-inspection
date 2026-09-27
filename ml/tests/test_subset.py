@@ -4,9 +4,9 @@ from hancut.data import subset
 from hancut.data.subset import Record
 
 
-def _records(facility: str, compliant: bool, n: int, prefix: str = "") -> list[Record]:
+def _records(item: str, clear: bool, n: int, prefix: str = "") -> list[Record]:
     return [
-        Record(image_id=f"{prefix}{facility}-{int(compliant)}-{i:04d}", facility=facility, compliant=compliant)
+        Record(image_id=f"{prefix}{item}-{int(clear)}-{i:04d}", item=item, clear=clear)
         for i in range(n)
     ]
 
@@ -19,18 +19,18 @@ class TestStratifiedSubset:
         records = _records("소형소화기", True, 50) + _records("소형소화기", False, 50)
         picked = subset.stratified_subset(records, ["소형소화기"], per_stratum=10, seed=1)
         summary = subset.summarize(picked)
-        assert summary == [{"facility": "소형소화기", "compliant": 10, "noncompliant": 10, "total": 20}]
+        assert summary == [{"item": "소형소화기", "clear": 10, "threat": 10, "total": 20}]
 
-    def test_drops_facilities_outside_phase_one(self):
+    def test_drops_items_outside_phase_one(self):
         records = _records("소형소화기", True, 5) + _records("완강기", True, 5)
         picked = subset.stratified_subset(records, ["소형소화기"], per_stratum=5, seed=1)
-        assert {r.facility for r in picked} == {"소형소화기"}
+        assert {r.item for r in picked} == {"소형소화기"}
 
     def test_takes_everything_when_a_stratum_is_short(self):
         records = _records("방화문", True, 10) + _records("방화문", False, 3)
         picked = subset.stratified_subset(records, ["방화문"], per_stratum=10, seed=1)
         summary = subset.summarize(picked)
-        assert summary[0]["noncompliant"] == 3
+        assert summary[0]["threat"] == 3
         assert subset.shortfalls(summary, 10) == ["방화문 미준수 3/10"]
 
     def test_same_seed_gives_the_same_subset(self):
@@ -64,15 +64,15 @@ class TestIndexIO:
         subset.write_index(path, records)
         assert subset.read_index(path) == records
 
-    def test_reads_compliant_flag_as_boolean(self, tmp_path):
+    def test_reads_clear_flag_as_boolean(self, tmp_path):
         path = tmp_path / "index.csv"
-        path.write_text("image_id,facility,compliant,source\na,방화문,1,site\nb,방화문,0,video\n", encoding="utf-8")
+        path.write_text("image_id,item,clear,source\na,방화문,1,site\nb,방화문,0,video\n", encoding="utf-8")
         records = subset.read_index(path)
-        assert [r.compliant for r in records] == [True, False]
+        assert [r.clear for r in records] == [True, False]
         assert records[1].source == "video"
 
     def test_rejects_index_missing_required_columns(self, tmp_path):
         path = tmp_path / "bad.csv"
-        path.write_text("image_id,facility\na,방화문\n", encoding="utf-8")
-        with pytest.raises(ValueError, match="compliant"):
+        path.write_text("image_id,item\na,방화문\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="clear"):
             subset.read_index(path)

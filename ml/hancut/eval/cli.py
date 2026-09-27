@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import zones
 
-FIELDS = ("image_id", "facility", "y_true", "score")
+FIELDS = ("image_id", "item", "y_true", "score")
 
 
 def read_predictions(path: Path) -> list[dict]:
@@ -23,7 +23,7 @@ def read_predictions(path: Path) -> list[dict]:
             if None in row or any(v is None for v in row.values()):
                 raise ValueError(f"{path}:{line}: 열 개수 불일치")
             row = {key: value.strip() for key, value in row.items()}
-            if not row["image_id"] or not row["facility"] or row["facility"] == "default":
+            if not row["image_id"] or not row["item"] or row["item"] == "default":
                 raise ValueError(f"{path}:{line}: 빈 ID/시설 또는 예약 시설명 default")
             if row["image_id"] in seen:
                 raise ValueError(f"{path}:{line}: 중복 image_id {row['image_id']}")
@@ -47,8 +47,8 @@ def vectors(rows):
 
 
 def groups(rows):
-    return {name: [r for r in rows if r["facility"] == name]
-            for name in sorted({r["facility"] for r in rows})}
+    return {name: [r for r in rows if r["item"] == name]
+            for name in sorted({r["item"] for r in rows})}
 
 
 def rate(value):
@@ -66,9 +66,9 @@ def run(args):
             raise ValueError(f"{name}: 임계값 보정에는 준수/미준수 모두 필요합니다")
     caps = sorted(set([*args.miss_caps, args.select_cap]))
     ys, scores = vectors(calibration)
-    facilities = [r["facility"] for r in calibration]
+    items = [r["item"] for r in calibration]
     overall = zones.sweep(ys, scores, caps, args.false_alarm_cap)
-    by_facility = zones.sweep_by_facility(facilities, ys, scores, caps, args.false_alarm_cap)
+    by_item = zones.sweep_by_item(items, ys, scores, caps, args.false_alarm_cap)
     table = {}
     for name, rows in {"default": calibration, **grouped}.items():
         y, s = vectors(rows)
@@ -83,8 +83,8 @@ def run(args):
               "y_true=1: 미준수, score=p(미준수). 상한은 이 표본에서의 경험적 비율이며 실서비스 보장이 아닙니다.",
               "", f"## 전체 (n={len(calibration)})", "", zones.format_table(overall)]
     for name, rows in grouped.items():
-        report.extend(["", f"## 시설: {name} (n={len(rows)})", "", zones.format_table(by_facility[name])])
-    metrics = {"calibration": {"overall": overall, "by_facility": by_facility},
+        report.extend(["", f"## 시설: {name} (n={len(rows)})", "", zones.format_table(by_item[name])])
+    metrics = {"calibration": {"overall": overall, "by_item": by_item},
                "selected_miss_rate_cap": args.select_cap, "false_alarm_cap": args.false_alarm_cap,
                "calibration_sha256": hashlib.sha256(args.csv.read_bytes()).hexdigest()}
     if args.test_csv:
@@ -94,18 +94,18 @@ def run(args):
         test_points = {}
         for name, rows in {"전체": test, **groups(test)}.items():
             # 전체도 시설별 임계값을 적용한다. 미등록 시설은 default로 평가한다.
-            decisions = [zones.zone_of(r["score"], zones.Thresholds(**{k: table.get(r["facility"], table["default"])[k] for k in ("low", "high")})) for r in rows]
+            decisions = [zones.zone_of(r["score"], zones.Thresholds(**{k: table.get(r["item"], table["default"])[k] for k in ("low", "high")})) for r in rows]
             n_non = sum(r["y_true"] for r in rows)
             n_com = len(rows) - n_non
             review = decisions.count(zones.REVIEW) / len(rows)
-            point = {"n": len(rows), "n_noncompliant": n_non,
-                     "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_COMPLIANT for r, d in zip(rows, decisions)) / n_non if n_non else None,
-                     "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_NONCOMPLIANT for r, d in zip(rows, decisions)) / n_com if n_com else None,
+            point = {"n": len(rows), "n_threat": n_non,
+                     "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_CLEAR for r, d in zip(rows, decisions)) / n_non if n_non else None,
+                     "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_ALARM for r, d in zip(rows, decisions)) / n_com if n_com else None,
                      "review_rate": review, "auto_rate": 1 - review}
             test_points[name] = point
         metrics["test"] = test_points
         metrics["test_sha256"] = hashlib.sha256(args.test_csv.read_bytes()).hexdigest()
-        metrics["test_default_facilities"] = sorted(set(groups(test)) - set(grouped))
+        metrics["test_default_items"] = sorted(set(groups(test)) - set(grouped))
         report.extend(["", "## 독립 시험셋 (시설별 고정 임계값, 미등록 시설은 default)", "",
                        "시험셋에서는 임계값을 다시 맞추지 않습니다. null은 해당 정답 클래스가 없어 계산 불가입니다.",
                        "```json", json.dumps(test_points, ensure_ascii=False, indent=2), "```"])

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 입력은 라벨에서 만든 인덱스 CSV다. 파서는 W2에 라벨 스키마를 확인한 뒤 작성한다.
 
-    image_id,facility,compliant,source
+    image_id,item,clear,source
     01_001_0001_O_F_00000001,소형소화기,1,site
 """
 
@@ -19,19 +19,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-INDEX_FIELDS = ("image_id", "facility", "compliant", "source")
+INDEX_FIELDS = ("image_id", "item", "clear", "source")
 
 
 @dataclass(frozen=True)
 class Record:
     image_id: str
-    facility: str
-    compliant: bool
+    item: str
+    clear: bool
     source: str = ""
 
     @property
     def stratum(self) -> tuple[str, bool]:
-        return (self.facility, self.compliant)
+        return (self.item, self.clear)
 
 
 def read_index(path: Path) -> list[Record]:
@@ -43,8 +43,8 @@ def read_index(path: Path) -> list[Record]:
         return [
             Record(
                 image_id=row["image_id"],
-                facility=row["facility"],
-                compliant=str(row["compliant"]).strip() in {"1", "true", "True"},
+                item=row["item"],
+                clear=str(row["clear"]).strip() in {"1", "true", "True"},
                 source=row.get("source", ""),
             )
             for row in reader
@@ -59,15 +59,15 @@ def write_index(path: Path, records: Iterable[Record]) -> None:
         for r in records:
             writer.writerow({
                 "image_id": r.image_id,
-                "facility": r.facility,
-                "compliant": int(r.compliant),
+                "item": r.item,
+                "clear": int(r.clear),
                 "source": r.source,
             })
 
 
 def stratified_subset(
     records: Sequence[Record],
-    facilities: Sequence[str],
+    items: Sequence[str],
     per_stratum: int,
     seed: int,
 ) -> list[Record]:
@@ -81,10 +81,10 @@ def stratified_subset(
     if per_stratum <= 0:
         raise ValueError("per_stratum 은 1 이상이어야 한다")
 
-    wanted = set(facilities)
+    wanted = set(items)
     buckets: dict[tuple[str, bool], list[Record]] = {}
     for record in records:
-        if record.facility in wanted:
+        if record.item in wanted:
             buckets.setdefault(record.stratum, []).append(record)
 
     rng = random.Random(seed)
@@ -97,16 +97,16 @@ def stratified_subset(
 
 def summarize(records: Sequence[Record]) -> list[dict]:
     """시설별 준수/미준수 장수 — 추출 결과를 눈으로 확인하는 용도."""
-    counts = Counter((r.facility, r.compliant) for r in records)
-    facilities = sorted({facility for facility, _ in counts})
+    counts = Counter((r.item, r.clear) for r in records)
+    items = sorted({item for item, _ in counts})
     return [
         {
-            "facility": facility,
-            "compliant": counts.get((facility, True), 0),
-            "noncompliant": counts.get((facility, False), 0),
-            "total": counts.get((facility, True), 0) + counts.get((facility, False), 0),
+            "item": item,
+            "clear": counts.get((item, True), 0),
+            "threat": counts.get((item, False), 0),
+            "total": counts.get((item, True), 0) + counts.get((item, False), 0),
         }
-        for facility in facilities
+        for item in items
     ]
 
 
@@ -114,8 +114,8 @@ def shortfalls(summary: Sequence[dict], per_stratum: int) -> list[str]:
     """목표 장수를 채우지 못한 층 — 데이터가 부족하다는 신호이므로 보고한다."""
     short: list[str] = []
     for row in summary:
-        if row["compliant"] < per_stratum:
-            short.append(f"{row['facility']} 준수 {row['compliant']}/{per_stratum}")
-        if row["noncompliant"] < per_stratum:
-            short.append(f"{row['facility']} 미준수 {row['noncompliant']}/{per_stratum}")
+        if row["clear"] < per_stratum:
+            short.append(f"{row['item']} 준수 {row['clear']}/{per_stratum}")
+        if row["threat"] < per_stratum:
+            short.append(f"{row['item']} 미준수 {row['threat']}/{per_stratum}")
     return short
