@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """
 판정 3구간 — ml/hancut/eval/zones.py 와 같은 규약을 서비스 쪽에서 쓴다.
 
 임계값은 학습 쪽에서 E2로 구한 뒤 `models/thresholds.json` 으로 전달한다.
 서버가 임의로 정하지 않는다.
 """
+
+from __future__ import annotations
 
 import json
 from dataclasses import dataclass
@@ -29,7 +29,7 @@ class Thresholds:
 
 def zone_of(score: float, thresholds: Thresholds) -> str:
     if not 0.0 <= score <= 1.0:
-        raise ValueError("score 는 p(미준수) 로 0..1 범위여야 한다")
+        raise ValueError("score 는 p(품목 있음) 으로 0..1 범위여야 한다")
     if score < thresholds.low:
         return AUTO_CLEAR
     if score >= thresholds.high:
@@ -43,10 +43,10 @@ def needs_review(zone: str) -> bool:
 
 def load_thresholds(path: Path) -> dict[str, Thresholds]:
     """
-    시설별 임계값. 시설마다 다른 값을 쓴다 (방화문과 유도등은 같지 않다).
+    품목별 임계값. 품목마다 다른 값을 쓴다 (총기와 라이터는 같지 않다).
 
         {"default": {"low": 0.2, "high": 0.8},
-         "방화문": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01}}
+         "Gun": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01}}
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
     if "default" not in raw:

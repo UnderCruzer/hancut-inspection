@@ -13,7 +13,7 @@ from app.predictor import Prediction
 class FakePredictor:
     model_version = "fake-0.1"
 
-    def __init__(self, score=0.9, item="소형소화기", reasons=("부식",)):
+    def __init__(self, score=0.9, item="Gun", reasons=("칼날 윤곽",)):
         self._prediction = Prediction(
             item=item, score=score, reasons=list(reasons), model_version=self.model_version
         )
@@ -27,7 +27,7 @@ def _thresholds_file(tmp_path, table=None):
     path = tmp_path / "thresholds.json"
     path.write_text(json.dumps(table or {
         "default": {"low": 0.2, "high": 0.8},
-        "방화문": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01},
+        "Knife": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01},
     }), encoding="utf-8")
     return path
 
@@ -70,7 +70,7 @@ class TestJudge:
         assert response.status_code == 200
         assert body["zone"] == judgment.AUTO_ALARM
         assert body["needs_review"] is False
-        assert body["reasons"] == ["부식"]
+        assert body["reasons"] == ["칼날 윤곽"]
         assert body["model_version"] == "fake-0.1"
 
     def test_middle_score_goes_to_a_human(self, tmp_path):
@@ -83,8 +83,8 @@ class TestJudge:
         assert body["zone"] == judgment.AUTO_CLEAR
 
     def test_item_specific_thresholds_are_used(self, tmp_path):
-        # 방화문은 low=0.05 — 같은 점수라도 기본 임계값(0.2)과 결과가 다르다
-        body = _upload(_client(tmp_path, FakePredictor(score=0.1, item="방화문"))).json()
+        # Knife은 low=0.05 — 같은 점수라도 기본 임계값(0.2)과 결과가 다르다
+        body = _upload(_client(tmp_path, FakePredictor(score=0.1, item="Knife"))).json()
         assert body["zone"] == judgment.REVIEW
         assert body["thresholds"] == {"low": 0.05, "high": 0.6}
 
@@ -105,7 +105,7 @@ class TestJudge:
 class TestThresholds:
     def test_requires_a_default_entry(self, tmp_path):
         path = tmp_path / "t.json"
-        path.write_text(json.dumps({"방화문": {"low": 0.1, "high": 0.9}}), encoding="utf-8")
+        path.write_text(json.dumps({"Knife": {"low": 0.1, "high": 0.9}}), encoding="utf-8")
         with pytest.raises(ValueError, match="default"):
             judgment.load_thresholds(path)
 

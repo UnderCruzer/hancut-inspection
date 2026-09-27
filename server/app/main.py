@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """
-판정 API — 점검 앱이 찍은 사진을 받아 준수 여부를 판정한다.
+판정 API — 판독 앱이 보낸 X-ray 사진에서 위해물품 유무를 판정한다.
 
-모델이 로드되지 않았으면 503. 최종 판정은 점검원이 하며, '확인 필요' 구간은
+모델이 로드되지 않았으면 503. 최종 판정은 판독관이 하며, '재검' 구간은
 반드시 사람에게 넘어간다.
 """
+
+from __future__ import annotations
 
 import os
 from pathlib import Path
