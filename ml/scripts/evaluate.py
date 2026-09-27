@@ -1,0 +1,9 @@
+"""저장소 루트에서 python ml/scripts/evaluate.py --help 로 실행."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from hancut.eval.cli import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())
