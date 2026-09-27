@@ -4,9 +4,11 @@
 /data/*
 ml/data/
 server/data/
-# 인덱스·임계값은 이미지가 아니라 재현에 필요한 기록이므로 커밋한다
+# 작은 기록(임계값 등)은 이미지가 아니라 재현에 필요한 것이므로 커밋한다
 !/data/*.csv
 !/data/*.json
+# 단, 인덱스는 26MB 파생 파일이라 제외한다. build_index.py 로 몇 초 만에 재생성된다
+/data/index.csv
 *.zip
 *.tar
 ml/runs/
