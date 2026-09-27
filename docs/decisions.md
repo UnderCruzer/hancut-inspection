@@ -158,3 +158,17 @@
 **버린 선택지** — 롱테일 축(표본이 적은 품목에서 임계값이 잡히는가). Baton 2,271 대 Powerbank 7,779 로 3.4배라 롱테일이라기엔 완만하다. 실험 하나를 세울 만한 대비가 아니다.
 
 **결과** — `ml/configs/items.json`, `docs/plan.md`, `docs/experiments.md`
+
+---
+
+## D13. 이전 주제의 파일을 리포에서 지운다
+
+**결정** — 2026-09-27. 현재 주제(X-ray 보안검색)와 관계없는 파일을 지운다. git 기록에는 남는다.
+
+**지운 것** — `docs/archive-aihub/` · `archive-visa/` · `archive-realiad/` · `archive-weqaa/`, 소방시설 발표 대본 생성기(`docs/tools/`), 640px 축소 모듈(`ml/hancut/data/resize.py`)과 `pillow` 의존성.
+
+**D3 과의 관계** — D3 은 AI Hub 원본 962GB 를 640px 로 한 번 줄여 학습 비용을 낮추는 결정이었다. PIDray 는 11GB 이고, 높이 448 고정·너비 가변인 라인 스캔 이미지라 정사각 축소는 오히려 해롭다. D3 을 지우지 않고 여기서 무효로 기록한다. D3 의 **결과** 줄이 가리키는 `resize.py` 는 더 이상 없다.
+
+**남긴 것** — 전환 경위를 설명하는 문장(README·plan·decisions·progress)은 기록이므로 남긴다. 코드·테스트 속 `facility`·`소형소화기`·`방화문` 은 ml·server·app 에 걸쳐 있어 #13 리네임에서 한꺼번에 바꾼다.
+
+**결과** — 이슈 #20, #8 닫음
