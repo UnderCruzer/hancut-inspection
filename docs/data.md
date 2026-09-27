@@ -84,9 +84,9 @@ EC2 에서 학습하는 것은 학술 이용이고 재배포가 아니므로 `us
 
 ## 쓰지 않는 데이터
 
-AI Hub 518 — 국외 반출 합의 없음. `docs/archive-aihub/` 참조.
-Weqaa — 반출 제약은 없으나 핀·호스 라벨이 누락 정답이 아니고 split 누수가 있다. `docs/archive-weqaa/` 참조.
-VisA / Real-IAD — 제품 결함 검사로의 전환은 취소됐다. `docs/archive-visa/`, `docs/archive-realiad/` 참조.
+AI Hub 518 — 국외 반출 합의 없음(D9).
+Weqaa — 반출 제약은 없으나 핀·호스 라벨이 누락 정답이 아니고 split 누수가 있다(D9).
+VisA / Real-IAD — 제품 결함 검사로의 전환은 취소됐다.
 SIXray — 학술 이용은 허용되나 **받을 방법이 없다**. 위 표 참조.
 
 기존 파일을 자동 삭제하지 않는다.
