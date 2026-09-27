@@ -63,12 +63,18 @@ cd app && flutter run
 data/
   pidray.zip       받은 파일 11GB. 풀고 나면 지워도 된다
   pidray/          압축 해제본 (#14)
-  index.csv        라벨에서 만든 인덱스 (#6) — 커밋한다
+  index.csv        이미지 x 품목 인덱스 (#6) — 커밋하지 않는다. 26MB, 재생성 가능
   thresholds.json  확정 임계값 (E2) — 커밋한다
 ```
 
-`/data/` 는 통째로 무시하되 `.csv` 와 `.json` 만 예외로 커밋한다.
-이미지는 재배포 금지지만 인덱스와 임계값은 재현에 필요한 기록이다.
+`/data/` 는 통째로 무시하되 작은 `.csv`·`.json` 은 예외로 커밋한다. 이미지는 재배포 금지다.
+`index.csv` 는 예외에서 다시 뺐다 — 26MB 파생 파일이라 커밋하면 저장소가 불어난다.
+
+인덱스는 인자 없이 만든다. 어노테이션 폴더를 알아서 찾는다.
+
+```bash
+python3 ml/scripts/build_index.py
+```
 
 SIXray 는 받을 수 없어 쓰지 않는다(#7). `docs/data.md` 참조.
 
