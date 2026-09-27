@@ -61,11 +61,16 @@ cd app && flutter run
 
 ```
 data/
-  pidray/     PIDray 원본 47,677장 (#14)
-  sixray/     SIXray 층화 서브셋 (#7)
-  index.csv   라벨에서 만든 인덱스 (#6)
-  subset.csv  층화 추출 결과 (#7) — 이 파일만 커밋한다
+  pidray.zip       받은 파일 11GB. 풀고 나면 지워도 된다
+  pidray/          압축 해제본 (#14)
+  index.csv        라벨에서 만든 인덱스 (#6) — 커밋한다
+  thresholds.json  확정 임계값 (E2) — 커밋한다
 ```
+
+`/data/` 는 통째로 무시하되 `.csv` 와 `.json` 만 예외로 커밋한다.
+이미지는 재배포 금지지만 인덱스와 임계값은 재현에 필요한 기록이다.
+
+SIXray 는 받을 수 없어 쓰지 않는다(#7). `docs/data.md` 참조.
 
 ## 자주 겪는 문제
 
