@@ -61,10 +61,10 @@ cd app && flutter run
 
 ```
 data/
-  raw/        AI Hub 원본 (약 962GB 중 8종만)
+  pidray/     PIDray 원본 47,677장 (#14)
+  sixray/     SIXray 층화 서브셋 (#7)
   index.csv   라벨에서 만든 인덱스 (#6)
   subset.csv  층화 추출 결과 (#7) — 이 파일만 커밋한다
-  resized/    640px 축소본 (#8)
 ```
 
 ## 자주 겪는 문제

@@ -1,0 +1,28 @@
+{
+  "source": "PIDray (12종) 및 SIXray (6종) 위해물품 클래스",
+  "note": "class_id 는 실제 어노테이션 파일을 확인한 뒤 채운다. 논문 표기 순서를 id 로 가정하지 않는다 (D5 와 같은 이유).",
+  "phases": {
+    "1": "PIDray 와 SIXray 에 모두 있고 두 쪽 다 표본이 충분한 5종. 장비·데이터셋 교차 검증의 기준 집합이다.",
+    "2": "PIDray 전체 12종."
+  },
+  "items": [
+    {"name": "총기",       "key": "gun",       "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
+    {"name": "칼",         "key": "knife",     "class_id": null, "phase": 1, "datasets": ["pidray", "sixray", "opixray"]},
+    {"name": "렌치",       "key": "wrench",    "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
+    {"name": "펜치",       "key": "pliers",    "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
+    {"name": "가위",       "key": "scissors",  "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
+    {"name": "망치",       "key": "hammer",    "class_id": null, "phase": 2, "datasets": ["pidray", "sixray"],
+     "note": "SIXray 에서 표본이 부족해 통상 제외된다. 실제 장수를 센 뒤 phase 1 승격 여부를 정한다."},
+    {"name": "수갑",       "key": "handcuffs", "class_id": null, "phase": 2, "datasets": ["pidray"]},
+    {"name": "경봉",       "key": "baton",     "class_id": null, "phase": 2, "datasets": ["pidray"]},
+    {"name": "스프레이",   "key": "sprayer",   "class_id": null, "phase": 2, "datasets": ["pidray"]},
+    {"name": "보조배터리", "key": "powerbank", "class_id": null, "phase": 2, "datasets": ["pidray"]},
+    {"name": "라이터",     "key": "lighter",   "class_id": null, "phase": 2, "datasets": ["pidray"]},
+    {"name": "탄약",       "key": "bullet",    "class_id": null, "phase": 2, "datasets": ["pidray"]}
+  ],
+  "devices": {
+    "note": "PIDray 는 서로 다른 장비 3대로 촬영됐다. 장비 식별자와 장비별 장수는 W1 에 실제 데이터로 확인해 채운다 (E4 의 입력).",
+    "count": 3,
+    "ids": null
+  }
+}
