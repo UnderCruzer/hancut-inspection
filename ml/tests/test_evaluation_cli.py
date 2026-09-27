@@ -11,7 +11,7 @@ from hancut.eval.zones import Thresholds, zone_of
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = 'image_id,item,y_true,score\n'
-VALID = HEADER + 'a,소화기,0,0.123456789\nb,소화기,1,0.876543219\nc,방화문,0,0.2\nd,방화문,1,0.8\n'
+VALID = HEADER + 'a,Gun,0,0.123456789\nb,Gun,1,0.876543219\nc,Knife,0,0.2\nd,Knife,1,0.8\n'
 
 
 def write_csv(tmp_path, content=VALID, name='validation.csv'):
@@ -26,8 +26,8 @@ def test_cli_exports_full_precision_server_compatible_thresholds(tmp_path):
     process = subprocess.run([sys.executable, str(ROOT / 'ml/scripts/evaluate.py'), str(path), '--output-dir', str(output)], capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
     table = json.loads((output / 'thresholds.json').read_text())
-    assert table['소화기']['low'] == 0.876543219
-    assert {'default', '소화기', '방화문'} == set(table)
+    assert table['Gun']['low'] == 0.876543219
+    assert {'default', 'Gun', 'Knife'} == set(table)
     spec = importlib.util.spec_from_file_location('server_judgment_contract', ROOT / 'server/app/judgment.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -46,7 +46,7 @@ def test_cli_exports_full_precision_server_compatible_thresholds(tmp_path):
     HEADER + 'a,x,1,1.1\n', HEADER + 'a,x,2,0.5\n', HEADER + 'a,x,1,no\n',
     HEADER + ',x,1,0.5\n', HEADER + 'a,,1,0.5\n', HEADER + 'a,default,1,0.5\n',
     HEADER + 'a,x,1\n', HEADER + 'a,x,1,0.5,extra\n',
-    HEADER + 'a,x,1,0.5\na,y,0,0.4\n',
+    HEADER + 'a,x,1,0.5\na,x,0,0.4\n',
     'image_id,item,y_true,score,score\na,x,1,0.5,0.5\n',
 ])
 def test_rejects_bad_csv(tmp_path, content):
@@ -66,14 +66,14 @@ def test_unreliable_thresholds_not_exported(tmp_path, content):
 
 def test_holdout_uses_frozen_thresholds_and_unknown_item_fallback(tmp_path):
     validation = write_csv(tmp_path)
-    test = write_csv(tmp_path, HEADER + 'e,소화기,1,0.01\nf,새시설,0,0.99\n', 'test.csv')
+    test = write_csv(tmp_path, HEADER + 'e,Gun,1,0.01\nf,새품목,0,0.99\n', 'test.csv')
     out = tmp_path / 'out'
     main([str(validation), '--output-dir', str(out), '--test-csv', str(test)])
     metrics = json.loads((out / 'metrics.json').read_text())
     assert metrics['test']['전체']['miss_rate'] == 1
     assert metrics['test']['전체']['false_alarm_rate'] == 1
-    assert metrics['test']['소화기']['false_alarm_rate'] is None
-    assert metrics['test_default_items'] == ['새시설']
+    assert metrics['test']['Gun']['false_alarm_rate'] is None
+    assert metrics['test_default_items'] == ['새품목']
 
 
 def test_rejects_overlap_and_overwrite(tmp_path):
@@ -101,3 +101,15 @@ def test_optimized_thresholds_match_brute_force():
         low = max(c for c in candidates if sum(y == 1 and s < c for y, s in zip(ys, scores)) / sum(ys) <= cap)
         highs = [c for c in candidates if c >= low and sum(y == 0 and s >= c for y, s in zip(ys, scores)) / ys.count(0) <= alarm]
         assert fit_thresholds(ys, scores, cap, alarm) == Thresholds(min(low, 1), min(min(highs), 1))
+
+
+def test_one_image_may_have_a_row_per_item(tmp_path):
+    # 품목 단위 이진 정의라 인덱스는 사진 한 장당 품목 수만큼 행을 가진다.
+    # 예전에는 image_id 만으로 중복을 막아서 두 번째 품목 행에서 멈췄다.
+    rows = read_predictions(write_csv(tmp_path, HEADER + 'x,Gun,1,0.9\nx,Knife,0,0.1\nx,Pliers,0,0.2\n'))
+    assert [(r['image_id'], r['item']) for r in rows] == [('x', 'Gun'), ('x', 'Knife'), ('x', 'Pliers')]
+
+
+def test_same_image_and_item_twice_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="중복 \\(image_id, item\\)"):
+        read_predictions(write_csv(tmp_path, HEADER + 'x,Gun,1,0.9\nx,Gun,0,0.1\n'))

@@ -24,10 +24,12 @@ def read_predictions(path: Path) -> list[dict]:
                 raise ValueError(f"{path}:{line}: 열 개수 불일치")
             row = {key: value.strip() for key, value in row.items()}
             if not row["image_id"] or not row["item"] or row["item"] == "default":
-                raise ValueError(f"{path}:{line}: 빈 ID/시설 또는 예약 시설명 default")
-            if row["image_id"] in seen:
-                raise ValueError(f"{path}:{line}: 중복 image_id {row['image_id']}")
-            seen.add(row["image_id"])
+                raise ValueError(f"{path}:{line}: 빈 ID/품목 또는 예약 품목명 default")
+            # 품목 단위 이진 정의라 사진 한 장이 품목 수만큼 행을 가진다. 고유 키는 (사진, 품목)이다.
+            key = (row["image_id"], row["item"])
+            if key in seen:
+                raise ValueError(f"{path}:{line}: 중복 (image_id, item) {key}")
+            seen.add(key)
             if row["y_true"] not in ("0", "1"):
                 raise ValueError(f"{path}:{line}: y_true는 0 또는 1")
             try:
@@ -63,7 +65,7 @@ def run(args):
     grouped = groups(calibration)
     for name, rows in {"default": calibration, **grouped}.items():
         if {r["y_true"] for r in rows} != {0, 1}:
-            raise ValueError(f"{name}: 임계값 보정에는 준수/미준수 모두 필요합니다")
+            raise ValueError(f"{name}: 임계값 보정에는 품목 있음/없음 표본이 모두 필요합니다")
     caps = sorted(set([*args.miss_caps, args.select_cap]))
     ys, scores = vectors(calibration)
     items = [r["item"] for r in calibration]
@@ -74,16 +76,16 @@ def run(args):
         y, s = vectors(rows)
         threshold = zones.fit_thresholds(y, s, args.select_cap, args.false_alarm_cap)
         point = zones.evaluate(y, s, threshold)
-        # high<=1 규약에서 score=1인 준수는 자동 미준수로 판정된다.
+        # high<=1 규약에서 score=1인 음성은 자동 적발로 판정된다.
         if point.miss_rate > args.select_cap or point.false_alarm_rate > args.false_alarm_cap:
             raise ValueError(f"{name}: 선택한 상한을 만족하지 못해 임계값 내보내기를 중단합니다")
         # 표의 반올림된 low/high를 재사용하면 경계 판정이 달라진다.
         table[name] = {"low": threshold.low, "high": threshold.high, "miss_rate_cap": args.select_cap}
     report = ["# E2 임계값 보정 결과", "", "검증셋에서 임계값을 선택한 결과입니다. 독립 시험 성능이 아닙니다.",
-              "y_true=1: 미준수, score=p(미준수). 상한은 이 표본에서의 경험적 비율이며 실서비스 보장이 아닙니다.",
+              "y_true=1: 품목 있음, score=p(품목 있음). 상한은 이 표본에서의 경험적 비율이며 실서비스 보장이 아닙니다.",
               "", f"## 전체 (n={len(calibration)})", "", zones.format_table(overall)]
     for name, rows in grouped.items():
-        report.extend(["", f"## 시설: {name} (n={len(rows)})", "", zones.format_table(by_item[name])])
+        report.extend(["", f"## 품목: {name} (n={len(rows)})", "", zones.format_table(by_item[name])])
     metrics = {"calibration": {"overall": overall, "by_item": by_item},
                "selected_miss_rate_cap": args.select_cap, "false_alarm_cap": args.false_alarm_cap,
                "calibration_sha256": hashlib.sha256(args.csv.read_bytes()).hexdigest()}
@@ -93,20 +95,20 @@ def run(args):
             raise ValueError("검증셋/시험셋 image_id 중복: 분할 누수")
         test_points = {}
         for name, rows in {"전체": test, **groups(test)}.items():
-            # 전체도 시설별 임계값을 적용한다. 미등록 시설은 default로 평가한다.
+            # 전체도 품목별 임계값을 적용한다. 미등록 품목은 default로 평가한다.
             decisions = [zones.zone_of(r["score"], zones.Thresholds(**{k: table.get(r["item"], table["default"])[k] for k in ("low", "high")})) for r in rows]
-            n_non = sum(r["y_true"] for r in rows)
-            n_com = len(rows) - n_non
+            n_pos = sum(r["y_true"] for r in rows)
+            n_neg = len(rows) - n_pos
             review = decisions.count(zones.REVIEW) / len(rows)
-            point = {"n": len(rows), "n_threat": n_non,
-                     "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_CLEAR for r, d in zip(rows, decisions)) / n_non if n_non else None,
-                     "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_ALARM for r, d in zip(rows, decisions)) / n_com if n_com else None,
+            point = {"n": len(rows), "n_threat": n_pos,
+                     "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_CLEAR for r, d in zip(rows, decisions)) / n_pos if n_pos else None,
+                     "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_ALARM for r, d in zip(rows, decisions)) / n_neg if n_neg else None,
                      "review_rate": review, "auto_rate": 1 - review}
             test_points[name] = point
         metrics["test"] = test_points
         metrics["test_sha256"] = hashlib.sha256(args.test_csv.read_bytes()).hexdigest()
         metrics["test_default_items"] = sorted(set(groups(test)) - set(grouped))
-        report.extend(["", "## 독립 시험셋 (시설별 고정 임계값, 미등록 시설은 default)", "",
+        report.extend(["", "## 독립 시험셋 (품목별 고정 임계값, 미등록 품목은 default)", "",
                        "시험셋에서는 임계값을 다시 맞추지 않습니다. null은 해당 정답 클래스가 없어 계산 불가입니다.",
                        "```json", json.dumps(test_points, ensure_ascii=False, indent=2), "```"])
     else:
