@@ -1,28 +1,256 @@
 {
-  "source": "PIDray (12종) 및 SIXray (6종) 위해물품 클래스",
-  "note": "class_id 는 실제 어노테이션 파일을 확인한 뒤 채운다. 논문 표기 순서를 id 로 가정하지 않는다 (D5 와 같은 이유).",
-  "phases": {
-    "1": "PIDray 와 SIXray 에 모두 있고 두 쪽 다 표본이 충분한 5종. 장비·데이터셋 교차 검증의 기준 집합이다.",
-    "2": "PIDray 전체 12종."
+  "source": "PIDray v1 (47,677장, 12종). 2026-09-27 실제 어노테이션에서 확인.",
+  "note": "class_id 는 xray_train.json 의 categories 에서 그대로 읽었다. 논문·README 표기 순서와 완전히 다르다 — 하드코딩했다면 12종 전부 틀렸다 (D5). positives 와 reliable_min_miss_rate 는 2026-09-27 실측이다.",
+  "splits": {
+    "train": 29457,
+    "test_easy": 9482,
+    "test_hard": 3733,
+    "test_hidden": 5005,
+    "note": "합계 47,677. IJCV 확장판(124,486장, easy 24,758 / hard 9,746 / hidden 13,069)이 아니다. 전부 양성이며 음성 이미지는 없다.",
+    "items_per_image": {
+      "test_easy": 1.0,
+      "test_hard": 2.08,
+      "test_hidden": 1.0,
+      "train": 1.31,
+      "note": "easy 와 hidden 은 이미지당 정확히 1종이다. hard 만 여러 종이 겹친다. hidden 은 어질러서가 아니라 숨겨서 어렵다."
+    }
+  },
+  "phase": {
+    "note": "이전의 phase 1/2 구분은 PIDray∩SIXray 를 뜻했으나 SIXray 확보 불가(#7)로 무의미해졌다. 현재는 12종 전부 phase 1 이다. 품목별 양성 장수를 센 뒤 측정 가능한 놓침률 기준으로 다시 나눈다."
   },
   "items": [
-    {"name": "총기",       "key": "gun",       "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
-    {"name": "칼",         "key": "knife",     "class_id": null, "phase": 1, "datasets": ["pidray", "sixray", "opixray"]},
-    {"name": "렌치",       "key": "wrench",    "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
-    {"name": "펜치",       "key": "pliers",    "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
-    {"name": "가위",       "key": "scissors",  "class_id": null, "phase": 1, "datasets": ["pidray", "sixray"]},
-    {"name": "망치",       "key": "hammer",    "class_id": null, "phase": 2, "datasets": ["pidray", "sixray"],
-     "note": "SIXray 에서 표본이 부족해 통상 제외된다. 실제 장수를 센 뒤 phase 1 승격 여부를 정한다."},
-    {"name": "수갑",       "key": "handcuffs", "class_id": null, "phase": 2, "datasets": ["pidray"]},
-    {"name": "경봉",       "key": "baton",     "class_id": null, "phase": 2, "datasets": ["pidray"]},
-    {"name": "스프레이",   "key": "sprayer",   "class_id": null, "phase": 2, "datasets": ["pidray"]},
-    {"name": "보조배터리", "key": "powerbank", "class_id": null, "phase": 2, "datasets": ["pidray"]},
-    {"name": "라이터",     "key": "lighter",   "class_id": null, "phase": 2, "datasets": ["pidray"]},
-    {"name": "탄약",       "key": "bullet",    "class_id": null, "phase": 2, "datasets": ["pidray"]}
+    {
+      "name": "경봉",
+      "key": "baton",
+      "dataset_name": "Baton",
+      "class_id": 1,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 373,
+        "test_hard": 278,
+        "test_hidden": 201,
+        "train": 1419,
+        "test_total": 852
+      },
+      "reliable_min_miss_rate": 0.0117
+    },
+    {
+      "name": "펜치",
+      "key": "pliers",
+      "dataset_name": "Pliers",
+      "class_id": 2,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 872,
+        "test_hard": 1050,
+        "test_hidden": 502,
+        "train": 4092,
+        "test_total": 2424
+      },
+      "reliable_min_miss_rate": 0.0041
+    },
+    {
+      "name": "망치",
+      "key": "hammer",
+      "dataset_name": "Hammer",
+      "class_id": 3,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 1288,
+        "test_hard": 820,
+        "test_hidden": 470,
+        "train": 3516,
+        "test_total": 2578
+      },
+      "reliable_min_miss_rate": 0.0039
+    },
+    {
+      "name": "보조배터리",
+      "key": "powerbank",
+      "dataset_name": "Powerbank",
+      "class_id": 4,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 1347,
+        "test_hard": 1030,
+        "test_hidden": 401,
+        "train": 5001,
+        "test_total": 2778
+      },
+      "reliable_min_miss_rate": 0.0036
+    },
+    {
+      "name": "가위",
+      "key": "scissors",
+      "dataset_name": "Scissors",
+      "class_id": 5,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 983,
+        "test_hard": 1008,
+        "test_hidden": 503,
+        "train": 4150,
+        "test_total": 2494
+      },
+      "reliable_min_miss_rate": 0.004
+    },
+    {
+      "name": "렌치",
+      "key": "wrench",
+      "dataset_name": "Wrench",
+      "class_id": 6,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 714,
+        "test_hard": 786,
+        "test_hidden": 501,
+        "train": 4234,
+        "test_total": 2001
+      },
+      "reliable_min_miss_rate": 0.005
+    },
+    {
+      "name": "총기",
+      "key": "gun",
+      "dataset_name": "Gun",
+      "class_id": 7,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 406,
+        "test_hard": 541,
+        "test_hidden": 519,
+        "train": 2069,
+        "test_total": 1466
+      },
+      "reliable_min_miss_rate": 0.0068
+    },
+    {
+      "name": "탄약",
+      "key": "bullet",
+      "dataset_name": "Bullet",
+      "class_id": 8,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 409,
+        "test_hard": 403,
+        "test_hidden": 299,
+        "train": 1832,
+        "test_total": 1111
+      },
+      "reliable_min_miss_rate": 0.009
+    },
+    {
+      "name": "스프레이",
+      "key": "sprayer",
+      "dataset_name": "Sprayer",
+      "class_id": 9,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 496,
+        "test_hard": 341,
+        "test_hidden": 400,
+        "train": 2946,
+        "test_total": 1237
+      },
+      "reliable_min_miss_rate": 0.0081
+    },
+    {
+      "name": "수갑",
+      "key": "handcuffs",
+      "dataset_name": "HandCuffs",
+      "class_id": 10,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 436,
+        "test_hard": 549,
+        "test_hidden": 302,
+        "train": 2091,
+        "test_total": 1287
+      },
+      "reliable_min_miss_rate": 0.0078
+    },
+    {
+      "name": "칼",
+      "key": "knife",
+      "dataset_name": "Knife",
+      "class_id": 11,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 928,
+        "test_hard": 619,
+        "test_hidden": 501,
+        "train": 3132,
+        "test_total": 2048
+      },
+      "reliable_min_miss_rate": 0.0049
+    },
+    {
+      "name": "라이터",
+      "key": "lighter",
+      "dataset_name": "Lighter",
+      "class_id": 12,
+      "phase": 1,
+      "datasets": [
+        "pidray"
+      ],
+      "positives": {
+        "test_easy": 1230,
+        "test_hard": 338,
+        "test_hidden": 406,
+        "train": 4117,
+        "test_total": 1974
+      },
+      "reliable_min_miss_rate": 0.0051
+    }
   ],
   "devices": {
-    "note": "PIDray 는 서로 다른 장비 3대로 촬영됐다. 장비 식별자와 장비별 장수는 W1 에 실제 데이터로 확인해 채운다 (E4 의 입력).",
-    "count": 3,
-    "ids": null
+    "available": false,
+    "note": "장비 메타데이터는 공개 파일에 없다. images 항목의 키는 height, width, id, file_name 뿐이고 파일명도 xray_#####.png 라 단서가 없다. 논문의 '장비 3종'은 수집 과정 서술이며 데이터에 반영돼 있지 않다. 따라서 E4(장비 교차)는 성립하지 않는다.",
+    "checked": "2026-09-27, xray_train.json / xray_test_easy.json / xray_test_hard.json"
+  },
+  "image_size": {
+    "note": "높이는 448 고정, 너비는 가변(확인된 예: 420, 580, 620). 컨베이어 라인 스캔 특성이다. 전처리에서 종횡비를 무시하고 정사각으로 늘이지 않는다."
+  },
+  "miss_rate_caps": {
+    "primary": [
+      0.05,
+      0.02,
+      0.01
+    ],
+    "note": "1/N 은 표현 가능한 하한이고 10/N 이 믿을 만한 하한이다. 1% 는 12종 전부 측정 가능하며 Baton 이 1.17% 로 가장 빠듯하다. 0.5% 는 Powerbank·Hammer·Scissors·Pliers·Knife·Wrench 6종만 가능하다. 0.1% 는 어느 품목도 불가하므로 시도하지 않는다.",
+    "per_item_by_difficulty": "품목 × 난이도로 쪼개면 hidden 의 Baton 이 201장이라 5% 가 한계다. 난이도별 분석은 품목을 합쳐서 본다."
   }
 }
