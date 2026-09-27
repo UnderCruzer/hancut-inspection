@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 /// 판정 3구간 — 서버(`server/app/judgment.py`), 학습(`ml/hancut/eval/zones.py`)과
 /// 같은 문자열 규약을 쓴다. 값이 어긋나면 앱이 잘못된 화면을 보여준다.
 enum JudgmentZone {
-  autoClear('auto_clear', '준수', '확인 없이 점검표에 반영됩니다'),
-  review('review', '확인 필요', '점검원이 직접 판단해야 합니다'),
-  autoAlarm('auto_alarm', '미준수', '사유와 함께 점검표에 반영됩니다');
+  autoClear('auto_clear', '통과', '판독관 확인 없이 통과합니다'),
+  review('review', '재검', '판독관이 직접 확인해야 합니다'),
+  autoAlarm('auto_alarm', '적발', '개봉 검사 대상으로 표시됩니다');
 
   const JudgmentZone(this.wireName, this.label, this.description);
 
@@ -13,7 +13,7 @@ enum JudgmentZone {
   final String label;
   final String description;
 
-  /// 모르는 값이 오면 조용히 넘기지 않고 '확인 필요'로 보낸다 — 사람이 보게 한다.
+  /// 모르는 값이 오면 조용히 넘기지 않고 '재검'으로 보낸다 — 사람이 보게 한다.
   static JudgmentZone parse(String value) {
     return JudgmentZone.values.firstWhere(
       (zone) => zone.wireName == value,

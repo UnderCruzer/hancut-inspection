@@ -16,7 +16,7 @@ void main() {
       expect(JudgmentZone.parse('').needsReview, isTrue);
     });
 
-    test('확인 필요 구간만 사람 판단이 필요하다', () {
+    test('재검 구간만 사람 판단이 필요하다', () {
       expect(JudgmentZone.autoClear.needsReview, isFalse);
       expect(JudgmentZone.autoAlarm.needsReview, isFalse);
       expect(JudgmentZone.review.needsReview, isTrue);
@@ -26,23 +26,23 @@ void main() {
   group('Judgment.fromJson', () {
     test('판정 응답을 읽는다', () {
       final judgment = Judgment.fromJson({
-        'item': '소형소화기',
+        'item': 'Gun',
         'score': 0.93,
         'zone': 'auto_alarm',
-        'reasons': ['부식'],
+        'reasons': ['칼날 윤곽'],
         'model_version': 'v0.1',
       });
 
-      expect(judgment.item, '소형소화기');
+      expect(judgment.item, 'Gun');
       expect(judgment.score, 0.93);
       expect(judgment.zone, JudgmentZone.autoAlarm);
-      expect(judgment.reasons, ['부식']);
+      expect(judgment.reasons, ['칼날 윤곽']);
       expect(judgment.modelVersion, 'v0.1');
     });
 
     test('사유가 없어도 깨지지 않는다', () {
       final judgment = Judgment.fromJson({
-        'item': '방화문',
+        'item': 'Knife',
         'score': 0.1,
         'zone': 'auto_clear',
       });
@@ -52,13 +52,13 @@ void main() {
     });
   });
 
-  testWidgets('홈 화면에 세 구간과 점검 시작 버튼이 보인다', (tester) async {
+  testWidgets('홈 화면에 세 구간과 판독 시작 버튼이 보인다', (tester) async {
     await tester.pumpWidget(const HancutApp());
 
     expect(find.text('한컷점검'), findsOneWidget);
-    expect(find.text('준수'), findsOneWidget);
-    expect(find.text('확인 필요'), findsOneWidget);
-    expect(find.text('미준수'), findsOneWidget);
+    expect(find.text('통과'), findsOneWidget);
+    expect(find.text('재검'), findsOneWidget);
+    expect(find.text('적발'), findsOneWidget);
 
     final button = tester.widget<FilledButton>(find.byType(FilledButton));
     expect(button.onPressed, isNull, reason: '촬영 화면은 W9에 붙인다');
