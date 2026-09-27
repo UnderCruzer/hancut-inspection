@@ -33,7 +33,7 @@
 ```
 feat(ml): add stratified subset sampler with reproducible seed
 fix(server): reject uploads over the size limit before reading the body
-exp(ml): record E1 two-stage comparison on 8 facility types
+exp(ml): record E2 operating points at 5, 2 and 1 percent miss-rate caps
 docs: note the W2 label schema findings
 ```
 
@@ -65,7 +65,7 @@ cd app    && flutter analyze && flutter test
 
 ## 하지 말 것
 
-- 이미지·라벨 JSON·모델 가중치 커밋 (AI Hub 재배포 제한)
+- 이미지·어노테이션 JSON·모델 가중치 커밋 (PIDray 재배포 금지)
 - 테스트 없이 새 모듈 추가
 - 판정 임계값을 코드에 하드코딩 — 학습 쪽 E2 결과를 파일로 받는다
 - 모델이 없을 때 그럴듯한 가짜 결과 반환
