@@ -5,7 +5,7 @@ from hancut.eval.zones import Thresholds
 
 
 def _perfect(n=100):
-    """미준수는 높은 점수, 준수는 낮은 점수 — 완전히 분리된 이상적인 모델."""
+    """양성은 높은 점수, 음성은 낮은 점수 — 완전히 분리된 이상적인 모델."""
     y = [1] * (n // 2) + [0] * (n // 2)
     s = [0.9] * (n // 2) + [0.1] * (n // 2)
     return y, s
@@ -39,7 +39,7 @@ class TestEvaluate:
 
     def test_miss_rate_counts_threat_sent_to_auto_clear(self):
         y = [1, 1, 1, 1, 0]
-        s = [0.1, 0.9, 0.9, 0.9, 0.1]  # 미준수 1건이 낮은 점수
+        s = [0.1, 0.9, 0.9, 0.9, 0.1]  # 양성 1건이 낮은 점수
         point = zones.evaluate(y, s, Thresholds(low=0.5, high=0.8))
         assert point.miss_rate == 0.25
         assert point.n_threat == 4
@@ -72,12 +72,12 @@ class TestEvaluate:
 
 class TestFitThresholds:
     def test_respects_the_miss_rate_cap(self):
-        # 미준수 10건 중 1건만 0.3 으로 낮게 예측된 모델
+        # 양성 10건 중 1건만 0.3 으로 낮게 예측된 모델
         y = [1] * 10 + [0] * 10
         s = [0.3] + [0.9] * 9 + [0.1] * 10
         t = zones.fit_thresholds(y, s, max_miss_rate=0.0)
         assert zones.evaluate(y, s, t).miss_rate == 0.0
-        assert t.low <= 0.3  # 0.3 을 자동 준수로 보내지 않는다
+        assert t.low <= 0.3  # 0.3 을 자동 통과로 보내지 않는다
 
     def test_higher_cap_allows_more_automation(self):
         y = [1] * 10 + [0] * 10
@@ -89,14 +89,14 @@ class TestFitThresholds:
 
     def test_false_alarm_cap_pushes_high_up(self):
         y = [1, 1, 0, 0]
-        s = [0.5, 0.9, 0.7, 0.1]  # 준수 1건이 0.7 로 높게 예측됨
+        s = [0.5, 0.9, 0.7, 0.1]  # 음성 1건이 0.7 로 높게 예측됨
         allowed = zones.fit_thresholds(y, s, 0.0, max_false_alarm_rate=0.5)
         blocked = zones.fit_thresholds(y, s, 0.0, max_false_alarm_rate=0.0)
         assert allowed.high <= 0.7 < blocked.high
 
     def test_high_never_drops_below_low_even_if_it_costs_false_alarms(self):
         # 놓침 허용이 0이면 low 가 0.9 까지 올라가고, high 는 그 아래로 못 내려간다.
-        # 오경보 상한이 사실상 적용되지 않는 경우 — 확인 필요 구간이 비어 버린다.
+        # 오경보 상한이 사실상 적용되지 않는 경우 — 재검 구간이 비어 버린다.
         y = [1, 1, 0, 0]
         s = [0.9, 0.9, 0.7, 0.1]
         t = zones.fit_thresholds(y, s, 0.0, max_false_alarm_rate=0.0)
@@ -104,7 +104,7 @@ class TestFitThresholds:
         assert zones.evaluate(y, s, t).review_rate == 0.0
 
     def test_unreachable_cap_leaves_the_auto_zone_empty(self):
-        # 모든 미준수가 0.0 — 어떤 low 를 써도 놓침률을 0 으로 만들 수 없다
+        # 모든 양성이 0.0 — 어떤 low 를 써도 놓침률을 0 으로 만들 수 없다
         y = [1, 0]
         s = [0.0, 0.0]
         t = zones.fit_thresholds(y, s, max_miss_rate=0.0)
@@ -127,17 +127,17 @@ class TestSweep:
             assert row["miss_rate"] <= row["miss_rate_cap"] + 1e-9
 
     def test_by_item_groups_independently(self):
-        items = ["방화문", "방화문", "통로유도등", "통로유도등"]
+        items = ["Knife", "Knife", "Lighter", "Lighter"]
         y = [1, 0, 1, 0]
         s = [0.6, 0.4, 0.99, 0.01]
         result = zones.sweep_by_item(items, y, s, miss_rate_caps=(0.0,))
-        assert set(result) == {"방화문", "통로유도등"}
-        # 잘 분리된 통로유도등이 방화문보다 확인 필요 비율이 낮다
-        assert result["통로유도등"][0]["review_rate"] <= result["방화문"][0]["review_rate"]
+        assert set(result) == {"Knife", "Lighter"}
+        # 잘 분리된 Lighter 가 Knife 보다 재검률이 낮다
+        assert result["Lighter"][0]["review_rate"] <= result["Knife"][0]["review_rate"]
 
     def test_by_item_rejects_length_mismatch(self):
         with pytest.raises(ValueError):
-            zones.sweep_by_item(["방화문"], [1, 0], [0.5, 0.5])
+            zones.sweep_by_item(["Knife"], [1, 0], [0.5, 0.5])
 
     def test_format_table_renders_every_row(self):
         y, s = _perfect(10)
