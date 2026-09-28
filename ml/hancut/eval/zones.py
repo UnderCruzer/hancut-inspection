@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 from bisect import bisect_left
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 AUTO_CLEAR = "auto_clear"
 REVIEW = "review"
@@ -210,6 +210,41 @@ def fit_thresholds(
             break
 
     return Thresholds(low=min(low, 1.0), high=min(high, 1.0))
+
+
+def fit_thresholds_grouped(
+    groups: Mapping[str, tuple[Sequence[int], Sequence[float]]],
+    max_miss_rate: float,
+    max_false_alarm_rate: float = 0.05,
+    *,
+    bound: str = "empirical",
+    delta: float = 0.05,
+) -> Thresholds:
+    """
+    집단마다 따로 구한 기준을 하나로 합친다 — 모든 집단에서 동시에 상한을 지키는 기준 (#27).
+
+    low 는 집단별 low 의 최솟값이다. low 를 내리면 어느 집단의 놓침도 늘지 않으므로, 가장 까다로운
+    집단의 low 를 따르면 나머지도 지켜진다. high 는 같은 이유로 최댓값이다.
+
+    쓸 때 집단을 알 필요가 없다. 검색대에서 어떤 가방이 숨긴 가방인지 미리 알 수 없으므로,
+    난이도별로 기준을 따로 쓰는 방식은 배치할 수 없다. 이 방식은 기준이 하나라 배치할 수 있다.
+
+    양성이 없는 집단은 low 에, 음성이 없는 집단은 high 에 제약을 주지 않는다.
+    """
+    lows, highs = [], []
+    for y, s in groups.values():
+        if not y:
+            continue
+        t = fit_thresholds(y, s, max_miss_rate, max_false_alarm_rate, bound=bound, delta=delta)
+        if any(y):
+            lows.append(t.low)
+        if not all(y):
+            highs.append(t.high)
+    if not lows and not highs:
+        raise ValueError("표본이 있는 집단이 없다")
+    low = min(lows) if lows else 0.0
+    high = max(highs) if highs else 1.0
+    return Thresholds(low=low, high=max(high, low))
 
 
 def sweep(

@@ -230,3 +230,49 @@ class TestUpperBoundFit:
         y, s = self._data(100, 100)
         rows = zones.sweep(y, s, (0.01,), bound="upper")
         assert rows[0]["low"] == 0.0
+
+
+class TestGroupedFit:
+    def _groups(self):
+        # easy: 양성 점수가 높다. hidden: 양성 일부가 낮은 점수라 더 까다롭다
+        easy_y = [1] * 200 + [0] * 200
+        easy_s = [0.9] * 200 + [0.1] * 200
+        hid_y = [1] * 200 + [0] * 200
+        hid_s = [0.3] * 20 + [0.9] * 180 + [0.1] * 200
+        return {"easy": (easy_y, easy_s), "hidden": (hid_y, hid_s)}
+
+    def test_low_follows_the_strictest_group(self):
+        g = self._groups()
+        combined = zones.fit_thresholds_grouped(g, 0.05)
+        separate = {k: zones.fit_thresholds(y, s, 0.05) for k, (y, s) in g.items()}
+        assert combined.low == min(t.low for t in separate.values())
+        assert combined.low == separate["hidden"].low
+
+    def test_every_group_meets_the_cap_with_the_single_threshold(self):
+        g = self._groups()
+        t = zones.fit_thresholds_grouped(g, 0.05)
+        for y, s in g.values():
+            assert zones.evaluate(y, s, t).miss_rate <= 0.05
+
+    def test_pooled_fit_can_break_the_hard_group(self):
+        # 한데 모아 맞추면 평균은 지키지만 hidden 은 넘칠 수 있다 — 이게 #27 의 이유다
+        g = self._groups()
+        y = g["easy"][0] + g["hidden"][0]
+        s = g["easy"][1] + g["hidden"][1]
+        pooled = zones.fit_thresholds(y, s, 0.05)
+        assert zones.evaluate(*g["hidden"], pooled).miss_rate > 0.05
+        grouped = zones.fit_thresholds_grouped(g, 0.05)
+        assert zones.evaluate(*g["hidden"], grouped).miss_rate <= 0.05
+
+    def test_groups_without_positives_do_not_constrain_low(self):
+        g = self._groups()
+        g["empty"] = ([0] * 50, [0.05] * 50)
+        assert zones.fit_thresholds_grouped(g, 0.05).low == zones.fit_thresholds_grouped(self._groups(), 0.05).low
+
+    def test_high_never_below_low(self):
+        t = zones.fit_thresholds_grouped(self._groups(), 0.05, bound="upper")
+        assert t.high >= t.low
+
+    def test_rejects_no_samples(self):
+        with pytest.raises(ValueError):
+            zones.fit_thresholds_grouped({"a": ([], [])}, 0.05)
