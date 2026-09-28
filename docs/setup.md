@@ -99,10 +99,19 @@ python3 ml/scripts/make_yolo_dataset.py          # data/yolo 생성. 이미지�
 **먼저 1 에폭만 돌려 시간을 잰다.** 에폭당 시간 × 에폭 수로 본 학습 시간과 비용을 정한 뒤 시작한다.
 
 ```bash
-yolo detect train data=data/yolo/pidray.yaml model=yolo11s.pt imgsz=640 epochs=1 batch=32 workers=4 device=0 project=ml/runs/detect name=e1_smoke exist_ok=True
+yolo detect train data=data/yolo/pidray.yaml model=yolo11s.pt imgsz=640 epochs=1 batch=32 workers=4 device=0 project=$PWD/ml/runs/detect name=e1_smoke exist_ok=True
 ```
 
-본 학습은 에폭 수만 바꾼다. 가중치는 `ml/runs/detect/<name>/weights/best.pt` 에 생기고 커밋하지 않는다.
+**`project` 는 반드시 절대 경로로 준다.** ultralytics 8.4 는 상대 경로 앞에 `runs/detect` 를 붙여,
+`project=ml/runs/detect` 가 `runs/detect/ml/runs/detect` 가 된다(2026-09-28 실측).
+
+1 에폭 실측(A10G, yolo11s, batch 32): **약 2분 45초**, GPU 메모리 7.6GB.
+
+본 학습은 에폭 수와 이름만 바꾼다. 가중치는 `ml/runs/detect/<name>/weights/best.pt` 에 생기고 커밋하지 않는다.
+
+```bash
+yolo detect train data=data/yolo/pidray.yaml model=yolo11s.pt imgsz=640 epochs=50 patience=15 batch=32 workers=4 device=0 project=$PWD/ml/runs/detect name=e1 exist_ok=True
+```
 
 학습이 끝나면 보정셋과 시험셋 점수를 뽑고 평가 CLI 를 돌린다.
 
