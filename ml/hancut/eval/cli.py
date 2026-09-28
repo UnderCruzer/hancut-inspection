@@ -60,6 +60,25 @@ def rate(value):
     return number
 
 
+def thresholds_for(table: dict, item: str) -> zones.Thresholds:
+    entry = table.get(item, table["default"])
+    return zones.Thresholds(low=entry["low"], high=entry["high"])
+
+
+def point_for(rows, table: dict) -> dict:
+    """고정 임계값표로 행들을 판정한 운영점. 미등록 품목은 default 로 판정한다."""
+    decisions = [zones.zone_of(r["score"], thresholds_for(table, r["item"])) for r in rows]
+    n_pos = sum(r["y_true"] for r in rows)
+    n_neg = len(rows) - n_pos
+    review = decisions.count(zones.REVIEW) / len(rows)
+    return {
+        "n": len(rows), "n_threat": n_pos,
+        "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_CLEAR for r, d in zip(rows, decisions)) / n_pos if n_pos else None,
+        "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_ALARM for r, d in zip(rows, decisions)) / n_neg if n_neg else None,
+        "review_rate": review, "auto_rate": 1 - review,
+    }
+
+
 def run(args):
     calibration = read_predictions(args.csv)
     grouped = groups(calibration)
@@ -69,12 +88,13 @@ def run(args):
     caps = sorted(set([*args.miss_caps, args.select_cap]))
     ys, scores = vectors(calibration)
     items = [r["item"] for r in calibration]
-    overall = zones.sweep(ys, scores, caps, args.false_alarm_cap)
-    by_item = zones.sweep_by_item(items, ys, scores, caps, args.false_alarm_cap)
+    fit = {"bound": args.bound, "delta": args.delta}
+    overall = zones.sweep(ys, scores, caps, args.false_alarm_cap, **fit)
+    by_item = zones.sweep_by_item(items, ys, scores, caps, args.false_alarm_cap, **fit)
     table = {}
     for name, rows in {"default": calibration, **grouped}.items():
         y, s = vectors(rows)
-        threshold = zones.fit_thresholds(y, s, args.select_cap, args.false_alarm_cap)
+        threshold = zones.fit_thresholds(y, s, args.select_cap, args.false_alarm_cap, **fit)
         point = zones.evaluate(y, s, threshold)
         # high<=1 규약에서 score=1인 음성은 자동 적발로 판정된다.
         if point.miss_rate > args.select_cap or point.false_alarm_rate > args.false_alarm_cap:
@@ -82,12 +102,16 @@ def run(args):
         # 표의 반올림된 low/high를 재사용하면 경계 판정이 달라진다.
         table[name] = {"low": threshold.low, "high": threshold.high, "miss_rate_cap": args.select_cap}
     report = ["# E2 임계값 보정 결과", "", "검증셋에서 임계값을 선택한 결과입니다. 독립 시험 성능이 아닙니다.",
-              "y_true=1: 품목 있음, score=p(품목 있음). 상한은 이 표본에서의 경험적 비율이며 실서비스 보장이 아닙니다.",
+              "y_true=1: 품목 있음, score=p(품목 있음). " + (
+                  f"상한 판정: 비율의 한쪽 신뢰 상한({1 - args.delta:.0%})이 상한 이하. 표본이 작으면 보수적으로 고릅니다."
+                  if args.bound == "upper" else
+                  "상한 판정: 이 표본에서의 경험적 비율. 실서비스 보장이 아닙니다."),
               "", f"## 전체 (n={len(calibration)})", "", zones.format_table(overall)]
     for name, rows in grouped.items():
         report.extend(["", f"## 품목: {name} (n={len(rows)})", "", zones.format_table(by_item[name])])
     metrics = {"calibration": {"overall": overall, "by_item": by_item},
                "selected_miss_rate_cap": args.select_cap, "false_alarm_cap": args.false_alarm_cap,
+               "bound": args.bound, "delta": args.delta,
                "calibration_sha256": hashlib.sha256(args.csv.read_bytes()).hexdigest()}
     if args.test_csv:
         test = read_predictions(args.test_csv)
@@ -96,15 +120,7 @@ def run(args):
         test_points = {}
         for name, rows in {"전체": test, **groups(test)}.items():
             # 전체도 품목별 임계값을 적용한다. 미등록 품목은 default로 평가한다.
-            decisions = [zones.zone_of(r["score"], zones.Thresholds(**{k: table.get(r["item"], table["default"])[k] for k in ("low", "high")})) for r in rows]
-            n_pos = sum(r["y_true"] for r in rows)
-            n_neg = len(rows) - n_pos
-            review = decisions.count(zones.REVIEW) / len(rows)
-            point = {"n": len(rows), "n_threat": n_pos,
-                     "miss_rate": sum(r["y_true"] == 1 and d == zones.AUTO_CLEAR for r, d in zip(rows, decisions)) / n_pos if n_pos else None,
-                     "false_alarm_rate": sum(r["y_true"] == 0 and d == zones.AUTO_ALARM for r, d in zip(rows, decisions)) / n_neg if n_neg else None,
-                     "review_rate": review, "auto_rate": 1 - review}
-            test_points[name] = point
+            test_points[name] = point_for(rows, table)
         metrics["test"] = test_points
         metrics["test_sha256"] = hashlib.sha256(args.test_csv.read_bytes()).hexdigest()
         metrics["test_default_items"] = sorted(set(groups(test)) - set(grouped))
@@ -135,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--select-cap", type=rate, default=0.01)
     parser.add_argument("--false-alarm-cap", type=rate, default=0.05)
     parser.add_argument("--test-csv", type=Path)
+    # empirical: 표본 비율이 상한 이하. upper: 비율의 한쪽 신뢰 상한이 상한 이하 (#25)
+    parser.add_argument("--bound", choices=zones.BOUNDS, default="empirical")
+    parser.add_argument("--delta", type=float, default=0.05, help="upper 에서 신뢰수준 1-delta")
     return parser
 
 

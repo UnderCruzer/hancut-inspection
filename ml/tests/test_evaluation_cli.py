@@ -113,3 +113,35 @@ def test_one_image_may_have_a_row_per_item(tmp_path):
 def test_same_image_and_item_twice_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="중복 \\(image_id, item\\)"):
         read_predictions(write_csv(tmp_path, HEADER + 'x,Gun,1,0.9\nx,Gun,0,0.1\n'))
+
+
+def _separable(n_pos, n_neg, items=("Gun", "Knife")):
+    rows = []
+    for item in items:
+        rows += [f"p{item}{i},{item},1,0.9" for i in range(n_pos)]
+        rows += [f"n{item}{i},{item},0,0.1" for i in range(n_neg)]
+    return HEADER + "\n".join(rows) + "\n"
+
+
+def test_upper_bound_empties_auto_clear_when_the_sample_is_small(tmp_path):
+    # 품목당 양성 100장이면 1% 를 95% 로 보장할 수 없다 → low = 0 → 자동 통과 없음
+    path = write_csv(tmp_path, _separable(100, 100))
+    main([str(path), "--output-dir", str(tmp_path / "upper"), "--bound", "upper"])
+    table = json.loads((tmp_path / "upper" / "thresholds.json").read_text())
+    assert table["Gun"]["low"] == 0.0
+    metrics = json.loads((tmp_path / "upper" / "metrics.json").read_text())
+    assert metrics["bound"] == "upper" and metrics["delta"] == 0.05
+    assert "신뢰 상한" in (tmp_path / "upper" / "report.md").read_text()
+
+    main([str(path), "--output-dir", str(tmp_path / "emp")])
+    assert json.loads((tmp_path / "emp" / "thresholds.json").read_text())["Gun"]["low"] > 0.1
+
+
+def test_point_for_matches_the_cli_test_section(tmp_path):
+    from hancut.eval.cli import point_for
+    cal = write_csv(tmp_path, _separable(50, 50), "cal.csv")
+    tst = write_csv(tmp_path, HEADER + "t1,Gun,1,0.05\nt2,Gun,0,0.95\nt3,Knife,1,0.9\nt4,Knife,0,0.1\n", "tst.csv")
+    main([str(cal), "--output-dir", str(tmp_path / "o"), "--test-csv", str(tst)])
+    table = json.loads((tmp_path / "o" / "thresholds.json").read_text())
+    metrics = json.loads((tmp_path / "o" / "metrics.json").read_text())
+    assert point_for(read_predictions(tst), table) == metrics["test"]["전체"]
