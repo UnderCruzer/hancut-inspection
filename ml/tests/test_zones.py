@@ -158,3 +158,75 @@ def test_default_caps_match_the_grid_recorded_in_items_json():
     assert sorted(inspect.signature(zones.sweep).parameters["miss_rate_caps"].default) == grid
     assert sorted(inspect.signature(zones.sweep_by_item).parameters["miss_rate_caps"].default) == grid
     assert sorted(cli.build_parser().get_default("miss_caps")) == grid
+
+
+class TestAllowedErrors:
+    def test_zero_errors_need_299_samples_for_one_percent(self):
+        # 1 - 0.05 ** (1 / n) <= 0.01  ⇔  n >= 298.07
+        assert zones.allowed_errors(298, 0.01) == -1
+        assert zones.allowed_errors(299, 0.01) == 0
+
+    def test_matches_the_binomial_tail(self):
+        # n=852, p=0.01: P(X<=3) ≈ 0.030 <= 0.05, P(X<=4) ≈ 0.073 > 0.05
+        assert zones.allowed_errors(852, 0.01) == 3
+
+    def test_is_stricter_than_the_sample_rate(self):
+        for n, cap in [(852, 0.01), (2778, 0.01), (10000, 0.05)]:
+            assert zones.allowed_errors(n, cap) < int(n * cap)
+
+    def test_grows_with_n(self):
+        values = [zones.allowed_errors(n, 0.02) for n in (100, 500, 1000, 5000)]
+        assert values == sorted(values)
+
+    def test_edges(self):
+        assert zones.allowed_errors(0, 0.01) == 0
+        assert zones.allowed_errors(50, 1.0) == 50
+        assert zones.allowed_errors(50, 0.0) == -1
+        with pytest.raises(ValueError):
+            zones.allowed_errors(10, 0.01, delta=0.0)
+
+
+class TestUpperBoundFit:
+    def _data(self, n_pos, n_neg, low_pos=0):
+        """양성은 대부분 0.9, low_pos 개만 0.1. 음성은 0.2."""
+        y = [1] * n_pos + [0] * n_neg
+        s = [0.1] * low_pos + [0.9] * (n_pos - low_pos) + [0.2] * n_neg
+        return y, s
+
+    def test_default_behaviour_is_unchanged(self):
+        y, s = self._data(100, 100, low_pos=1)
+        assert zones.fit_thresholds(y, s, 0.01) == zones.fit_thresholds(y, s, 0.01, bound="empirical")
+
+    def test_small_sample_cannot_auto_clear_under_the_upper_bound(self):
+        # 양성 100장이면 0 개 틀려도 1% 를 95% 로 보장할 수 없다 → 자동 통과를 비운다
+        y, s = self._data(100, 100)
+        empirical = zones.fit_thresholds(y, s, 0.01)
+        upper = zones.fit_thresholds(y, s, 0.01, bound="upper")
+        assert empirical.low > 0.2
+        assert upper.low == 0.0
+
+    def test_large_sample_allows_auto_clear(self):
+        y, s = self._data(400, 400)
+        assert zones.fit_thresholds(y, s, 0.01, bound="upper").low > 0.2
+
+    def test_upper_bound_is_never_more_aggressive(self):
+        import random
+        rng = random.Random(0)
+        for _ in range(30):
+            n = rng.randint(50, 800)
+            y = [rng.random() < 0.3 for _ in range(n)]
+            s = [min(1.0, max(0.0, rng.gauss(0.7 if t else 0.3, 0.2))) for t in y]
+            y = [int(t) for t in y]
+            if 0 < sum(y) < n:
+                e = zones.fit_thresholds(y, s, 0.02)
+                u = zones.fit_thresholds(y, s, 0.02, bound="upper")
+                assert u.low <= e.low
+
+    def test_rejects_unknown_bound(self):
+        with pytest.raises(ValueError, match="bound"):
+            zones.fit_thresholds([0, 1], [0.1, 0.9], 0.01, bound="loose")
+
+    def test_sweep_passes_the_bound_through(self):
+        y, s = self._data(100, 100)
+        rows = zones.sweep(y, s, (0.01,), bound="upper")
+        assert rows[0]["low"] == 0.0
