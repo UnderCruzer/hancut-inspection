@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """
-판정 API — 점검 앱이 찍은 사진을 받아 준수 여부를 판정한다.
+판정 API — 판독 앱이 보낸 X-ray 사진에서 위해물품 유무를 판정한다.
 
-모델이 로드되지 않았으면 503. 최종 판정은 점검원이 하며, '확인 필요' 구간은
+모델이 로드되지 않았으면 503. 최종 판정은 판독관이 하며, '재검' 구간은
 반드시 사람에게 넘어간다.
 """
+
+from __future__ import annotations
 
 import os
 from pathlib import Path
@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 class JudgmentResponse(BaseModel):
-    facility: str
+    item: str
     score: float
     zone: str
     needs_review: bool
@@ -64,11 +64,11 @@ async def judge(request: Request, image: UploadFile = File(...)) -> JudgmentResp
         raise HTTPException(status_code=413, detail=f"파일이 너무 크다 (최대 {MAX_UPLOAD_BYTES} bytes)")
 
     prediction = predictor.predict(payload)
-    table = judgment.thresholds_for(thresholds, prediction.facility)
+    table = judgment.thresholds_for(thresholds, prediction.item)
     zone = judgment.zone_of(prediction.score, table)
 
     return JudgmentResponse(
-        facility=prediction.facility,
+        item=prediction.item,
         score=round(prediction.score, 4),
         zone=zone,
         needs_review=judgment.needs_review(zone),

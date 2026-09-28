@@ -1,6 +1,6 @@
 {
   "_note": "ml 쪽 zones.fit_thresholds() 결과를 models/thresholds.json 으로 복사해 쓴다. 이 값은 예시이며 실측이 아니다.",
-  "default": {"low": 0.2, "high": 0.8, "miss_rate_cap": 0.03},
-  "방화문": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01},
-  "통로유도등": {"low": 0.35, "high": 0.75, "miss_rate_cap": 0.03}
+  "default": {"low": 0.2, "high": 0.8, "miss_rate_cap": 0.02},
+  "Gun": {"low": 0.05, "high": 0.6, "miss_rate_cap": 0.01},
+  "Lighter": {"low": 0.35, "high": 0.75, "miss_rate_cap": 0.02}
 }

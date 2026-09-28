@@ -14,18 +14,18 @@ class HomePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('점검 흐름', style: Theme.of(context).textTheme.titleMedium),
+          Text('판독 흐름', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          const Text('촬영 → 판정 → 확인·정정 → 점검표 초안'),
+          const Text('X-ray → 판정 → 재검·정정 → 판독 기록'),
           const SizedBox(height: 24),
           Text('판정 구간', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final zone in JudgmentZone.values) _ZoneTile(zone: zone),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: null, // 촬영 화면은 W9
+            onPressed: null, // 판독 화면은 W10
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('점검 시작 (준비 중)'),
+            label: const Text('판독 시작 (준비 중)'),
           ),
         ],
       ),
