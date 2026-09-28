@@ -86,3 +86,35 @@ SIXray 는 받을 수 없어 쓰지 않는다(#7). `docs/data.md` 참조.
 | `ModuleNotFoundError: hancut` | 잘못된 디렉터리에서 실행 | `ml/`에서 실행 (pyproject의 `pythonpath` 설정) |
 | 서버가 계속 503 | 임계값 파일 없음 또는 모델 미탑재 | `/health`로 어느 쪽인지 확인 |
 | CI 워크플로 push 거부 | 토큰에 `workflow` 권한 없음 | `gh auth refresh -s workflow` |
+
+## E1 — 검출기 학습 (#23, AWS 인스턴스)
+
+저장소 루트에서, `source /opt/pytorch/bin/activate` 한 상태로 실행한다. 학습은 tmux 안에서 돌린다.
+
+```bash
+pip install -q ultralytics
+python3 ml/scripts/make_yolo_dataset.py          # data/yolo 생성. 이미지는 링크라 금방 끝난다
+```
+
+**먼저 1 에폭만 돌려 시간을 잰다.** 에폭당 시간 × 에폭 수로 본 학습 시간과 비용을 정한 뒤 시작한다.
+
+```bash
+yolo detect train data=data/yolo/pidray.yaml model=yolo11s.pt imgsz=640 epochs=1 batch=32 workers=4 device=0 project=ml/runs/detect name=e1_smoke exist_ok=True
+```
+
+본 학습은 에폭 수만 바꾼다. 가중치는 `ml/runs/detect/<name>/weights/best.pt` 에 생기고 커밋하지 않는다.
+
+학습이 끝나면 보정셋과 시험셋 점수를 뽑고 평가 CLI 를 돌린다.
+
+```bash
+python3 ml/scripts/predict_scores.py ml/runs/detect/e1/weights/best.pt calib
+python3 ml/scripts/predict_scores.py ml/runs/detect/e1/weights/best.pt test_hidden
+python3 ml/scripts/evaluate.py ml/runs/predictions/calib.csv --output-dir ml/runs/e2 --test-csv ml/runs/predictions/test_hidden.csv
+```
+
+| 폴더 | 무엇 | 쓰임 |
+|---|---|---|
+| `images/train` | 학습 85% | 가중치 학습 |
+| `images/val` | 학습 5% | 학습 중 에폭 선택 |
+| `images/calib` | 학습 10% | 임계값 보정. **val 과 섞지 않는다** |
+| `images/test_*` | 시험 easy · hard · hidden | 최종 평가. 학습에도 보정에도 쓰지 않는다 |
