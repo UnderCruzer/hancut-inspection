@@ -114,11 +114,18 @@ def main() -> int:
 
     if per_item:
         keys = list(per_item)
+        # 품목이 있는데 검출기가 그 품목 박스를 하나도 내지 않은 비율. 점수가 0 이면 '없음'과 구분할 수
+        # 없으므로, 이 비율이 놓침률 상한보다 크면 자동 통과를 거의 열 수 없다.
+        blind = {}
+        for i in items:
+            pos = [r for r in test_eval if r["item"] == i and r["y_true"] == 1]
+            blind[i] = sum(r["score"] == 0.0 for r in pos) / len(pos) if pos else None
         lines += ["", "## 품목별 놓침 / 재검", "",
-                  "| 품목 | " + " | ".join(keys) + " |", "|---|" + "---:|" * len(keys)]
+                  "박스 없음 = 품목이 있는데 검출기가 그 품목 박스를 하나도 내지 않은 비율 (설정과 무관).", "",
+                  "| 품목 | 박스 없음 | " + " | ".join(keys) + " |", "|---|---:|" + "---:|" * len(keys)]
         for i in items:
             cells = [f"{pct(per_item[k][i]['miss_rate'])} / {pct(per_item[k][i]['review_rate'])}" for k in keys]
-            lines.append(f"| {i} | " + " | ".join(cells) + " |")
+            lines.append(f"| {i} | {pct(blind[i])} | " + " | ".join(cells) + " |")
 
     text = "\n".join(lines) + "\n"
     (out / "summary.md").write_text(text, encoding="utf-8")

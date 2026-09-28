@@ -44,6 +44,7 @@ def test_compares_four_configurations_on_the_same_evaluation_images(tmp_path):
     for key in "ABCD":
         assert f"| {key} |" in summary
     assert "## 품목별 놓침 / 재검" in summary
+    assert "박스 없음" in summary
     # 평가 사진은 시험셋의 절반, 보정 사진과 겹치지 않는다
     calib = {r["image_id"] for r in csv.DictReader((out / "data" / "test_calib.csv").open())}
     evaluation = {r["image_id"] for r in csv.DictReader((out / "data" / "test_eval.csv").open())}
