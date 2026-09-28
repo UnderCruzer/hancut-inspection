@@ -25,11 +25,11 @@ PRED = REPO / "ml" / "runs" / "predictions"
 RUNS = REPO / "ml" / "runs"
 
 
-def check_categories() -> bool:
+def check_categories() -> bool | None:
     print("## 1. 품목 번호표\n")
     if ANN is None:
         print("어노테이션 폴더를 찾지 못했다.")
-        return False
+        return None
     ref, ok = None, True
     for f in ("xray_train", "xray_test_easy", "xray_test_hard", "xray_test_hidden"):
         table = {c["id"]: c["name"] for c in json.loads((ANN / f"{f}.json").read_text())["categories"]}
@@ -40,15 +40,15 @@ def check_categories() -> bool:
     return ok
 
 
-def check_truth() -> bool:
+def check_truth() -> bool | None:
     print("\n## 2. 정답 대조 (예측 CSV vs 이름으로 만든 인덱스)\n")
     test_all = PRED / "test_all.csv"
     if not INDEX.is_file():
         print("data/index.csv 가 없다. `python3 ml/scripts/build_index.py` 를 먼저 돌린다.")
-        return False
+        return None
     if not test_all.is_file():
         print(f"{test_all} 가 없다.")
-        return False
+        return None
     index = {}
     with INDEX.open(encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
@@ -88,6 +88,10 @@ def main() -> int:
     truth = check_truth()
     per_difficulty()
     print("\n## 판정\n")
+    if cats is None or truth is None:
+        # 확인하지 못한 것과 틀린 것은 다르다. 파일이 없으면 판정하지 않는다.
+        print("필요한 파일이 없어 **판정하지 못했다.** 위 안내대로 파일을 만든 뒤 다시 돌린다.")
+        return 2
     if cats and truth:
         print("라벨 경로에는 버그가 없다. 시험셋 놓침률은 파이프라인 문제가 아니라 실제 결과다.")
         return 0
