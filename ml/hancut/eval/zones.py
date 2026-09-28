@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Iterable, Sequence
@@ -110,11 +111,49 @@ def _candidates(scores: Sequence[float]) -> list[float]:
     return sorted({0.0, *scores, 1.0 + 1e-9})
 
 
+BOUNDS = ("empirical", "upper")
+
+
+def allowed_errors(n: int, cap: float, delta: float = 0.05) -> int:
+    """
+    n 개 중 몇 개까지 틀려도 '참 비율이 cap 이하'라고 1-delta 로 말할 수 있나.
+
+    Clopper–Pearson 한쪽 상한을 쓴다. k 개를 틀렸을 때의 상한이 cap 이하인 것은
+    이항분포에서 P(X <= k | n, cap) <= delta 인 것과 같다. 그 최대 k 를 돌려준다.
+    0 개를 틀려도 보장할 수 없을 만큼 n 이 작으면 -1 이다 — 그 구간은 비워야 한다.
+
+    예: cap 1%, delta 5% 에서 0 개 틀림으로 보장하려면 n 이 299 이상이어야 한다.
+    """
+    if n < 0 or not 0.0 <= cap <= 1.0 or not 0.0 < delta < 1.0:
+        raise ValueError("n >= 0, 0 <= cap <= 1, 0 < delta < 1 이어야 한다")
+    if n == 0 or cap >= 1.0:
+        return n
+    if cap <= 0.0:
+        return -1
+    log_delta = math.log(delta)
+    log_p, log_q = math.log(cap), math.log1p(-cap)
+    log_pmf = n * log_q                     # P(X = 0)
+    log_cdf = log_pmf
+    k = 0
+    while log_cdf <= log_delta:
+        if k == n:
+            return n
+        # P(X = k+1) = P(X = k) * (n - k) / (k + 1) * p / q
+        log_pmf += math.log(n - k) - math.log(k + 1) + log_p - log_q
+        k += 1
+        log_cdf = log_cdf + math.log1p(math.exp(log_pmf - log_cdf)) if log_pmf <= log_cdf \
+            else log_pmf + math.log1p(math.exp(log_cdf - log_pmf))
+    return k - 1
+
+
 def fit_thresholds(
     y_true: Sequence[int],
     scores: Sequence[float],
     max_miss_rate: float,
     max_false_alarm_rate: float = 0.05,
+    *,
+    bound: str = "empirical",
+    delta: float = 0.05,
 ) -> Thresholds:
     """
     놓침률 상한을 지키는 가장 큰 low, 오경보 상한을 지키는 가장 작은 high.
@@ -126,13 +165,28 @@ def fit_thresholds(
     high를 높이면 오경보는 감소한다. 다만 high<=1 규약 때문에 품목 없는 사진의 점수가
     정확히 1이면 오경보 상한을 만족하지 못할 수 있다. 내보내기 전 evaluate()로
     실제 상한 충족 여부를 확인한다. 후보별 누적 개수는 이진 탐색으로 계산한다.
+
+    bound="empirical" — 표본의 비율이 상한 이하면 된다 (기존 동작).
+    bound="upper"     — 비율의 한쪽 신뢰 상한(1-delta)이 상한 이하여야 한다. 표본이 작을수록
+                        보수적이 되고, 0 개 틀림으로도 보장할 수 없으면 그 구간을 비운다.
+                        표본에서 딱 맞춘 기준은 다른 분포에서 넘치기 쉽다(#25).
     """
     _validate(y_true, scores)
     if not 0.0 <= max_miss_rate <= 1.0 or not 0.0 <= max_false_alarm_rate <= 1.0:
         raise ValueError("상한은 0..1 범위여야 한다")
+    if bound not in BOUNDS:
+        raise ValueError(f"bound 는 {BOUNDS} 중 하나여야 한다")
 
     n_pos = sum(y_true)
     n_neg = len(y_true) - n_pos
+    if bound == "upper":
+        miss_limit = allowed_errors(n_pos, max_miss_rate, delta)
+        alarm_limit = allowed_errors(n_neg, max_false_alarm_rate, delta)
+        miss_ok = lambda k: k <= miss_limit  # noqa: E731
+        alarm_ok = lambda k: k <= alarm_limit  # noqa: E731
+    else:
+        miss_ok = lambda k: (k / n_pos if n_pos else 0.0) <= max_miss_rate  # noqa: E731
+        alarm_ok = lambda k: (k / n_neg if n_neg else 0.0) <= max_false_alarm_rate  # noqa: E731
 
     non_scores = sorted(s for y, s in zip(y_true, scores) if y == 1)
     com_scores = sorted(s for y, s in zip(y_true, scores) if y == 0)
@@ -140,8 +194,7 @@ def fit_thresholds(
     low = 0.0
     for candidate in candidates:
         misses = bisect_left(non_scores, candidate)
-        miss_rate = misses / n_pos if n_pos else 0.0
-        if miss_rate <= max_miss_rate:
+        if miss_ok(misses):
             low = candidate
         else:
             break
@@ -151,8 +204,7 @@ def fit_thresholds(
         if candidate < low:
             break
         false_alarms = n_neg - bisect_left(com_scores, candidate)
-        rate = false_alarms / n_neg if n_neg else 0.0
-        if rate <= max_false_alarm_rate:
+        if alarm_ok(false_alarms):
             high = candidate
         else:
             break
@@ -165,11 +217,14 @@ def sweep(
     scores: Sequence[float],
     miss_rate_caps: Sequence[float] = (0.01, 0.02, 0.05),
     max_false_alarm_rate: float = 0.05,
+    *,
+    bound: str = "empirical",
+    delta: float = 0.05,
 ) -> list[dict]:
     """놓침률 상한별 운영점 — E2 결과 표의 한 행씩."""
     rows = []
     for cap in miss_rate_caps:
-        thresholds = fit_thresholds(y_true, scores, cap, max_false_alarm_rate)
+        thresholds = fit_thresholds(y_true, scores, cap, max_false_alarm_rate, bound=bound, delta=delta)
         row = {"miss_rate_cap": cap, **evaluate(y_true, scores, thresholds).as_row()}
         rows.append(row)
     return rows
@@ -181,6 +236,9 @@ def sweep_by_item(
     scores: Sequence[float],
     miss_rate_caps: Sequence[float] = (0.01, 0.02, 0.05),
     max_false_alarm_rate: float = 0.05,
+    *,
+    bound: str = "empirical",
+    delta: float = 0.05,
 ) -> dict[str, list[dict]]:
     """품목별로 따로 계산한다 — 총기와 라이터는 같은 임계값을 쓰지 않는다."""
     if not (len(items) == len(y_true) == len(scores)):
@@ -193,7 +251,7 @@ def sweep_by_item(
         ss.append(s)
 
     return {
-        item: sweep(ys, ss, miss_rate_caps, max_false_alarm_rate)
+        item: sweep(ys, ss, miss_rate_caps, max_false_alarm_rate, bound=bound, delta=delta)
         for item, (ys, ss) in sorted(grouped.items())
     }
 
