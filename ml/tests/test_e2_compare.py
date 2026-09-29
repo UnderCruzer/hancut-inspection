@@ -41,8 +41,9 @@ def test_compares_four_configurations_on_the_same_evaluation_images(tmp_path):
     result = _run("--pred-dir", _pred_dir(tmp_path / "pred"), "--out-dir", out, "--cap", "0.05")
     assert result.returncode == 0, result.stdout + result.stderr
     summary = (out / "summary.md").read_text()
-    for key in "ABCD":
+    for key in "ABCDEF":
         assert f"| {key} |" in summary
+    assert "가장 나쁜 칸" in summary
     assert "## 품목별 놓침 / 재검" in summary
     assert "박스 없음" in summary
     # 평가 사진은 시험셋의 절반, 보정 사진과 겹치지 않는다
