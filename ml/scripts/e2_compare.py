@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hancut.eval import cli, resplit, zones  # noqa: E402
+from hancut.eval import bags, cli, resplit, zones  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 DIFFICULTIES = ("easy", "hard", "hidden")
@@ -131,7 +131,7 @@ def main() -> int:
         "| 설정 | 보정 | 판정 | 놓침 | 재검 | 자동 | 오경보 | easy 놓침 | hard 놓침 | hidden 놓침 | 가장 나쁜 칸 (품목·난이도) |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
-    per_item = {}
+    per_item, bag_rows = {}, []
     for key, cal_name, bound_name, source, bound, grouped in CONFIGS:
         run_dir = out / key
         try:
@@ -152,6 +152,7 @@ def main() -> int:
         total = cli.point_for(test_eval, table)
         diffs = {d: cli.point_for(rows, table) for d, rows in by_diff.items()}
         per_item[key] = {i: cli.point_for([r for r in test_eval if r["item"] == i], table) for i in items}
+        bag_rows.append((key, cal_name, bound_name, bags.bag_summary(bags.bag_verdicts(test_eval, table))))
         cell, cell_miss, cell_n = worst_cell(test_eval, table, items)
         flag = "" if cell_miss <= args.cap else " ❌"
         lines.append(
@@ -160,6 +161,18 @@ def main() -> int:
             + " | ".join(pct(diffs[d]["miss_rate"]) for d in DIFFICULTIES)
             + f" | {cell} {pct(cell_miss)} (n={cell_n}){flag} |"
         )
+
+    if bag_rows:
+        # 판독관은 가방을 본다. 품목 하나라도 적발이면 적발, 하나라도 재검이면 재검, 전부 통과여야 통과 (#29)
+        lines += ["", "## 가방 단위", "",
+                  "평가 사진은 전부 위해물품이 든 가방이라 '통과'는 곧 놓침이다. 빈 가방 통과율은 이 데이터로 잴 수 없다.",
+                  "지목 = 재검 가방에서 판독관에게 짚어 준 품목 수(12종 중). 적중 = 실제로 든 품목이 모두 지목 안에 있는 비율.", "",
+                  "| 설정 | 보정 | 판정 | 적발 | 재검 | 통과(=놓침) | 재검 가방 지목 품목 수 | 지목 적중 |",
+                  "|---|---|---|---:|---:|---:|---:|---:|"]
+        for key, cal_name, bound_name, b in bag_rows:
+            flagged = "-" if b["flagged_mean"] is None else f"{b['flagged_mean']:.1f}"
+            lines.append(f"| {key} | {cal_name} | {bound_name} | {pct(b['alarm_rate'])} | {pct(b['review_rate'])} | "
+                         f"**{pct(b['clear_rate'])}** | {flagged} | {pct(b['hit_rate'])} |")
 
     if per_item:
         keys = list(per_item)
