@@ -140,3 +140,14 @@ def class_counts(stems: Iterable[str], labels: Mapping[str, Sequence[Box]]) -> C
         for c in {b.class_index for b in labels[stem]}:
             counts[c] += 1
     return counts
+
+
+def repeat_counts(classes_by_stem: Mapping[str, Iterable[int]], repeat: Mapping[int, int]) -> dict[str, int]:
+    """
+    학습 사진마다 몇 번 보여줄지 (#33). 사진에 든 품목의 반복 횟수 중 가장 큰 값, 해당 없으면 1.
+
+    한 사진에 칼과 가위가 같이 있어도 3 + 3 이 아니라 3 번이다.
+    """
+    if any(n < 1 for n in repeat.values()):
+        raise ValueError("반복 횟수는 1 이상이다")
+    return {stem: max([repeat.get(c, 1) for c in classes] or [1]) for stem, classes in classes_by_stem.items()}

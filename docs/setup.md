@@ -127,3 +127,31 @@ python3 ml/scripts/evaluate.py ml/runs/predictions/calib.csv --output-dir ml/run
 | `images/val` | 학습 5% | 학습 중 에폭 선택 |
 | `images/calib` | 학습 10% | 임계값 보정. **val 과 섞지 않는다** |
 | `images/test_*` | 시험 easy · hard · hidden | 최종 평가. 학습에도 보정에도 쓰지 않는다 |
+
+## 반복 학습 — 칼·가위 혼동 (#33, AWS 인스턴스)
+
+E1 과 달라지는 것은 학습 사진 목록 하나다. 총기·칼·가위가 든 사진을 3번씩 보여준다.
+결과는 E1 을 덮어쓰지 않도록 이름을 `os` 로 나눠 둔다.
+
+```bash
+python3 ml/scripts/make_oversampled_train.py      # data/yolo/images/train_os, pidray_os.yaml
+```
+
+출력 첫 줄의 배수만큼 에폭이 길어진다 (E1 2분 45초 × 배수).
+
+```bash
+yolo detect train data=data/yolo/pidray_os.yaml model=yolo11s.pt imgsz=640 epochs=50 patience=15 batch=32 workers=4 device=0 project=$PWD/ml/runs/detect name=os exist_ok=True
+```
+
+점수 추출은 `predictions_os` 로 따로 쓴다.
+
+```bash
+for s in calib test_easy test_hard test_hidden; do python3 ml/scripts/predict_scores.py ml/runs/detect/os/weights/best.pt $s --out ml/runs/predictions_os/$s.csv; done
+```
+
+비교는 E1 과 같은 스크립트에 폴더와 가중치만 바꿔 준다.
+
+```bash
+for c in 0.05 0.02 0.01; do python3 ml/scripts/e2_compare.py --pred-dir ml/runs/predictions_os --cap $c; done
+python3 ml/scripts/analyze_misses.py --weights ml/runs/detect/os/weights/best.pt --pred-dir ml/runs/predictions_os
+```

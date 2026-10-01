@@ -110,3 +110,13 @@ class TestSplit:
     def test_rejects_fractions_that_do_not_sum_to_one(self):
         with pytest.raises(ValueError, match="합이 1"):
             yolo.split_train(_labels(), {"train": 0.8, "calib": 0.1})
+
+
+def test_repeat_counts_takes_the_largest_factor_per_image():
+    classes = {"a": [6], "b": [10, 4], "c": [0], "d": []}
+    assert yolo.repeat_counts(classes, {6: 3, 10: 3, 4: 2}) == {"a": 3, "b": 3, "c": 1, "d": 1}
+
+
+def test_repeat_counts_rejects_zero():
+    with pytest.raises(ValueError):
+        yolo.repeat_counts({"a": [1]}, {1: 0})
