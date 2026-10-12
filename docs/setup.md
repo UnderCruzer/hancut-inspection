@@ -155,3 +155,12 @@ for s in calib test_easy test_hard test_hidden; do python3 ml/scripts/predict_sc
 for c in 0.05 0.02 0.01; do python3 ml/scripts/e2_compare.py --pred-dir ml/runs/predictions_os --cap $c; done
 python3 ml/scripts/analyze_misses.py --weights ml/runs/detect/os/weights/best.pt --pred-dir ml/runs/predictions_os
 ```
+
+## 발표용 예시 사진과 검출기 세부 성능 (#35, AWS 인스턴스)
+
+```bash
+python3 ml/scripts/make_samples.py        # ml/runs/samples — 품목 12종 잘라낸 사진, 난이도별 예시. 커밋하지 않는다
+python3 ml/scripts/eval_detector.py       # val · 시험 세 난이도의 전체 · 품목별 정밀도 · 재현율 · mAP
+```
+
+예시 사진은 PIDray 재배포 금지 조건 때문에 저장소에 올리지 않는다. 발표 자료에만 원 논문을 인용해 쓴다.
