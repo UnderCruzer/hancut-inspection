@@ -164,3 +164,50 @@ python3 ml/scripts/eval_detector.py       # val · 시험 세 난이도의 전�
 ```
 
 예시 사진은 PIDray 재배포 금지 조건 때문에 저장소에 올리지 않는다. 발표 자료에만 원 논문을 인용해 쓴다.
+
+## 라이터·탄약 타일 추론 비교
+
+재학습 없이 원본 전체 사진과 네 모서리의 겹치는 확대 영역을 함께 본다.
+타일의 라이터·탄약 박스만 원본 좌표로 복원하고 클래스별 NMS로 병합한다.
+다른 10종의 박스는 두 비교군에서 동일한지 코드로 확인한다.
+설정은 `ml/configs/target_tiles_20261017.json`에 기록했다.
+
+```bash
+source /opt/pytorch/bin/activate
+cd ~/hancut-inspection
+python -m pytest -q ml/tests/test_tiling.py ml/tests/test_eval_tiled.py
+# 새 출력 경로만 사용한다. 기존 경로면 중단한다.
+bash ml/scripts/run_tiled_experiment.sh "$PWD/ml/runs/target_tiles_new"
+```
+
+장시간 실행은 위 명령을 tmux 안에서 시작한다. 출력은 `pipeline.log`에 기록되므로
+학습·실험 세션 화면 대신 별도 터미널에서 다음처럼 조회한다.
+
+```bash
+tail -f ~/hancut-inspection/ml/runs/target_tiles_20261017/pipeline.log
+cat ~/hancut-inspection/ml/runs/target_tiles_20261017/stage.txt
+cat ~/hancut-inspection/ml/runs/target_tiles_20261017/pipeline.exit
+```
+
+`tail -f`에서 Ctrl+C는 로그 조회만 끝낸다. 완료 여부는 `stage=complete`와
+`pipeline.exit=0`으로 확인한다. 결과는 `inference/<split>/metrics.json`,
+운영 지표는 `e2_<baseline|tiled>_<상한>/summary.md`다.
+검출 비교는 동일한 정사각 패딩(`rect=False`)과 고정 conf=0.25를 사용하므로,
+기존 `val`의 직사각 패딩·자동 선택 운영점과 숫자를 직접 비교하지 않는다.
+
+단순 타일의 오탐을 줄이는 후처리 후보는 **calib만** 사용해서 선택한다.
+기존 전체 사진 박스를 복구하고, 첫 타일 병합에서 살아남은 추가 박스의 점수를 조정한다.
+원시 타일 박스 전체를 다시 병합한 실험은 아니다. 선택 시점 이후에는 설정을 바꾸지 않는다.
+
+```bash
+python ml/scripts/refine_tiled.py select \
+  --source ml/runs/target_tiles_20261017/inference \
+  --out ml/runs/target_tiles_20261017/frozen_selection.json
+python ml/scripts/refine_tiled.py evaluate \
+  --source ml/runs/target_tiles_20261017/inference \
+  --selection ml/runs/target_tiles_20261017/frozen_selection.json \
+  --out ml/runs/target_tiles_20261017/refined
+```
+
+`select`는 calib 완료 뒤 실행할 수 있고, `evaluate`는 네 분할 완료 뒤 실행한다.
+`refined`에도 기존 E2 CLI를 동일하게 적용할 수 있다. 기존 실험 폴더에 재실행하지 않는다.

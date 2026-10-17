@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "eval_detector.py"
 spec = importlib.util.spec_from_file_location("eval_detector", SCRIPT)
@@ -28,3 +29,20 @@ def test_report_has_overall_and_per_class_tables():
 def test_split_yaml_points_val_at_the_split(tmp_path):
     text = ed.split_yaml(tmp_path / "s.yaml", "test_hard", NAMES).read_text()
     assert "val: images/test_hard" in text and "train: images/train" in text and "  1: Pliers" in text
+
+
+def test_custom_resolution_reaches_model_and_report(tmp_path):
+    class Model:
+        def val(self, **kwargs):
+            assert kwargs["imgsz"] == 960
+            return SimpleNamespace(
+                ap_class_index=[0],
+                box=SimpleNamespace(p=[0.8], r=[0.7], ap50=[0.6], ap=[0.5],
+                                    mp=0.8, mr=0.7, map50=0.6, map=0.5),
+            )
+
+    result = ed.evaluate(Model(), tmp_path / "data.yaml", "0", 32, imgsz=960)
+    result["images"] = 10
+    report = ed.build_report("w.pt", {"val": result}, NAMES, imgsz=960)
+    assert "imgsz 960" in report
+    assert "| Baton | 0.600 |" in report

@@ -54,16 +54,16 @@ def per_class_table(results: dict[str, dict], names: list[str], metric: str) -> 
     return out
 
 
-def build_report(weights: str, results: dict[str, dict], names: list[str]) -> str:
-    lines = ["# 검출기 세부 성능 (#35)", "", f"가중치: `{weights}` · imgsz 640 · IoU 0.5 기준 매칭", "",
+def build_report(weights: str, results: dict[str, dict], names: list[str], imgsz: int = 640) -> str:
+    lines = ["# 검출기 세부 성능 (#35)", "", f"가중치: `{weights}` · imgsz {imgsz} · IoU 0.5 기준 매칭", "",
              "## 전체 (12종 평균)", ""] + overall_table(results)
     for m in ("map50", "r", "p", "map"):
         lines += ["", f"## 품목별 {HEAD[m]}", ""] + per_class_table(results, names, m)
     return "\n".join(lines) + "\n"
 
 
-def evaluate(model, yaml: Path, device: str, batch: int) -> dict:
-    m = model.val(data=str(yaml), split="val", imgsz=640, batch=batch, device=device, plots=False, verbose=False)
+def evaluate(model, yaml: Path, device: str, batch: int, imgsz: int = 640) -> dict:
+    m = model.val(data=str(yaml), split="val", imgsz=imgsz, batch=batch, device=device, plots=False, verbose=False)
     box = m.box
     per = {}
     for i, c in enumerate(m.ap_class_index):
@@ -77,8 +77,11 @@ def main() -> int:
     parser.add_argument("--splits", nargs="+", default=list(SPLITS), choices=SPLITS)
     parser.add_argument("--device", default="0")
     parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--out-dir", type=Path)
     args = parser.parse_args()
+    if args.imgsz <= 0:
+        parser.error("--imgsz 는 양수여야 한다")
 
     if not args.weights.is_file():
         print(f"없다: {args.weights}")
@@ -94,10 +97,10 @@ def main() -> int:
     for split in args.splits:
         images = len(list((DATA / "images" / split).glob("*.png")))
         print(f"{split}: {images:,}장 평가 중...")
-        results[split] = evaluate(model, split_yaml(out / f"{split}.yaml", split, names), args.device, args.batch)
+        results[split] = evaluate(model, split_yaml(out / f"{split}.yaml", split, names), args.device, args.batch, args.imgsz)
         results[split]["images"] = images
 
-    report = build_report(str(args.weights.relative_to(REPO) if args.weights.is_relative_to(REPO) else args.weights), results, names)
+    report = build_report(str(args.weights.relative_to(REPO) if args.weights.is_relative_to(REPO) else args.weights), results, names, args.imgsz)
     (out / "summary.md").write_text(report, encoding="utf-8")
     print("\n" + report)
     print(f"저장: {out / 'summary.md'}")
