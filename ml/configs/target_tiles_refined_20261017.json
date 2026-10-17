@@ -1,0 +1,12 @@
+{
+  "choices": {
+    "Lighter": {"weight": 0.25, "nms_iou": 0.5},
+    "Bullet": {"weight": 0.0, "nms_iou": 0.7}
+  },
+  "calibration_split": "calib",
+  "calibration_images": 2944,
+  "calibration_cache_sha256": "e2d135a41fc23e43818e0d8fa6d67d780ec6745597d11cc0da6ce61c63c7e5c5",
+  "selection_rule": "max calib AP50 subject to AP50-95 >= baseline - 0.005; baseline fallback",
+  "frozen_at": "2026-10-17T16:37:50+09:00",
+  "caveat": "Surviving crop candidates only; exploratory existing PIDray test data. Not adopted for deployment."
+}
