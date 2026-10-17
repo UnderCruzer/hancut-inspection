@@ -1,0 +1,19 @@
+{
+  "seed": 0,
+  "training_resolution": 960,
+  "baseline_resolution": 640,
+  "epochs": 50,
+  "batch": 32,
+  "patience": 15,
+  "change": "imgsz only; original train/val/calib/test splits preserved",
+  "split_counts": {
+    "train": 25039,
+    "val": 1474,
+    "calib": 2944,
+    "test_easy": 9482,
+    "test_hard": 3733,
+    "test_hidden": 5005
+  },
+  "pretrained_sha256": "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5",
+  "baseline_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754"
+}
