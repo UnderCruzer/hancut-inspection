@@ -1,0 +1,18 @@
+{
+  "experiment": "paired full-image versus full-image plus four overlapping crops",
+  "weights": "ml/runs/detect/e1_smoke/weights/best.pt",
+  "expected_weights_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754",
+  "targets": ["Lighter", "Bullet"],
+  "tile_fraction_per_axis": 0.6,
+  "imgsz": 640,
+  "rect": false,
+  "conf": 0.001,
+  "fixed_detection_conf": 0.25,
+  "predict_and_merge_nms_iou": 0.7,
+  "batch_images": 8,
+  "seed": 0,
+  "splits": ["calib", "test_hidden", "test_easy", "test_hard"],
+  "e2_caps": [0.01, 0.02, 0.05],
+  "e2_fraction": 0.5,
+  "notes": "Parameters fixed before full evaluation. Historical PIDray tests are exploratory, not an untouched holdout. Non-target predictions must be identical in both arms. Compare detection AP, fixed-conf recall/precision, and E2 operating metrics; never adopt on recall alone."
+}
