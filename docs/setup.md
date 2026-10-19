@@ -229,3 +229,17 @@ python ml/scripts/run_mixup_experiment.py run > ml/runs/overlap_mixup_20261017/p
 
 `run`은 smoke 결과가 없으면 시작하지 않는다. 학습 두 개 → E1·대조군·mixup 검출 평가 →
 점수 추출 → E2 상한 1·2·5%를 순서대로 실행한다. 진행은 `status.json`, 완료는 `pipeline.exit=0`으로 확인한다.
+
+## 세 모델 점수 결합 (#41, AWS 인스턴스)
+
+학습 없이 저장된 예측 CSV 만 쓴다. 세 갈래를 만들고 같은 방식으로 평가한다.
+
+```bash
+E1=ml/runs/predictions; M960=ml/runs/lighter_train960_20261016/predictions; MIX=ml/runs/overlap_mixup_20261017/predictions_mixup; OUT=ml/runs/fusion_20261019
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model 960=$M960 --out $OUT/e1_960                                     # 지난 결합 재현 확인
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model 960=$M960 --model mixup=$MIX --out $OUT/all3                      # 세 모델 전부
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model 960=$M960 --model mixup=$MIX --select calib-ap --out $OUT/calib_ap  # 품목별 선택(calib)
+for a in e1_960 all3 calib_ap; do for c in 0.01 0.02 0.05; do python3 ml/scripts/e2_compare.py --pred-dir $OUT/$a --cap $c --seed 0 --out-dir $OUT/e2_${a}_$c; done; done
+```
+
+`calib-ap` 의 품목별 선택은 학습 분할 calib(2,944장)에서만 정해진다. 시험 결과를 보고 바꾸지 않는다.
