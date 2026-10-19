@@ -211,3 +211,21 @@ python ml/scripts/refine_tiled.py evaluate \
 
 `select`는 calib 완료 뒤 실행할 수 있고, `evaluate`는 네 분할 완료 뒤 실행한다.
 `refined`에도 기존 E2 CLI를 동일하게 적용할 수 있다. 기존 실험 폴더에 재실행하지 않는다.
+
+## 겹침 MixUp 미세조정 비교 (#38)
+
+E1 가중치에서 같은 설정으로 대조군(mixup 0)과 mixup 0.3을 각각 20에폭 이어 학습한다.
+두 쪽 모두 원래 E1 가중치에서 새로 시작하고, 출력 폴더가 이미 있으면 중단한다.
+설정은 `ml/configs/overlap_mixup_20261017.json`이다.
+
+```bash
+source /opt/pytorch/bin/activate
+cd ~/hancut-inspection
+python ml/scripts/run_mixup_experiment.py prepare          # 가중치 해시·분할 수·경로 중복 확인
+python ml/scripts/run_mixup_experiment.py train --arm smoke  # 1에폭 점검, smoke_result.json 생성
+tmux new -s mixup-run
+python ml/scripts/run_mixup_experiment.py run > ml/runs/overlap_mixup_20261017/pipeline.log 2>&1
+```
+
+`run`은 smoke 결과가 없으면 시작하지 않는다. 학습 두 개 → E1·대조군·mixup 검출 평가 →
+점수 추출 → E2 상한 1·2·5%를 순서대로 실행한다. 진행은 `status.json`, 완료는 `pipeline.exit=0`으로 확인한다.

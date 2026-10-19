@@ -1,0 +1,28 @@
+{
+  "experiment": "E1 paired fine-tuning: MixUp overlap versus same-epoch control",
+  "weights": "ml/runs/detect/e1_smoke/weights/best.pt",
+  "weights_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754",
+  "data": "data/yolo/pidray.yaml",
+  "ultralytics": "8.4.164",
+  "arms": {"control": 0.0, "mixup": 0.3},
+  "train": {
+    "epochs": 20, "patience": 0, "imgsz": 640, "batch": 32,
+    "workers": 4, "device": "0", "seed": 0, "deterministic": true,
+    "optimizer": "AdamW", "lr0": 0.0003, "lrf": 0.1,
+    "momentum": 0.9, "weight_decay": 0.0005,
+    "warmup_epochs": 1.0, "warmup_bias_lr": 0.0,
+    "warmup_momentum": 0.8, "cos_lr": false,
+    "mosaic": 1.0, "close_mosaic": 5, "cutmix": 0.0, "copy_paste": 0.0,
+    "hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4,
+    "degrees": 0.0, "translate": 0.1, "scale": 0.5,
+    "shear": 0.0, "perspective": 0.0, "flipud": 0.0, "fliplr": 0.5,
+    "amp": true, "cache": false, "rect": false,
+    "save": true, "save_period": 5, "plots": true, "val": true,
+    "resume": false, "exist_ok": false
+  },
+  "eval": {"imgsz": 640, "batch": 32, "conf": 0.001, "caps": [0.01, 0.02, 0.05], "seed": 0},
+  "expected_counts": {"train": 25039, "val": 1474, "calib": 2944, "test_easy": 9482, "test_hard": 3733, "test_hidden": 5005},
+  "checkpoint_selection": "best.pt selected by original val fitness; no test-set selection",
+  "hypothesis": "Learning from overlapping training images may improve hidden-item recognition, particularly Lighter. MixUp is not a physical X-ray simulation or a substitute for real hidden examples.",
+  "caveats": "Same seed, initialization, data and optimizer in both arms; only MixUp probability differs. Extra draws change later RNG consumption. close_mosaic disables MixUp too, so treatment runs for first 15 epochs. Existing PIDray tests are exploratory; no independent holdout claim. All 12 classes and E2 rates must be evaluated."
+}
