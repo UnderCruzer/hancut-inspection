@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hancut.eval import bags, cli, resplit, zones  # noqa: E402
+from hancut.eval.grouped import FALSE_ALARM_CAP, grouped_table, worst_cell  # noqa: E402,F401
 
 REPO = Path(__file__).resolve().parents[2]
 DIFFICULTIES = ("easy", "hard", "hidden")
@@ -42,39 +43,6 @@ CONFIGS = [
     ("E", "시험", "비율·난이도", "test", "empirical", True),
     ("F", "시험", "95%상한·난이도", "test", "upper", True),
 ]
-FALSE_ALARM_CAP = 0.05
-
-
-def grouped_table(rows, cap: float, bound: str, delta: float) -> dict:
-    """품목마다 기준 하나. easy·hard·hidden 모두에서 동시에 상한을 지키도록 고른다 (#27)."""
-    def groups(subset):
-        out = {}
-        for r in subset:
-            y, s = out.setdefault(resplit.difficulty_of(r["image_id"]), ([], []))
-            y.append(r["y_true"])
-            s.append(r["score"])
-        return out
-
-    fit = dict(bound=bound, delta=delta)
-    table = {}
-    for item in sorted({r["item"] for r in rows}):
-        t = zones.fit_thresholds_grouped(groups([r for r in rows if r["item"] == item]), cap, FALSE_ALARM_CAP, **fit)
-        table[item] = {"low": t.low, "high": t.high, "miss_rate_cap": cap}
-    t = zones.fit_thresholds_grouped(groups(rows), cap, FALSE_ALARM_CAP, **fit)
-    table["default"] = {"low": t.low, "high": t.high, "miss_rate_cap": cap}
-    return table
-
-
-def worst_cell(rows, table, items) -> tuple[str, float, int]:
-    """품목 × 난이도 칸 가운데 놓침률이 가장 높은 칸. E5 의 판정은 모든 칸이 상한 이하인가다."""
-    worst = ("", -1.0, 0)
-    for item in items:
-        for d in DIFFICULTIES:
-            cell = [r for r in rows if r["item"] == item and resplit.difficulty_of(r["image_id"]) == d]
-            point = cli.point_for(cell, table) if cell else None
-            if point and point["miss_rate"] is not None and point["miss_rate"] > worst[1]:
-                worst = (f"{item}·{d}", point["miss_rate"], point["n_threat"])
-    return worst
 
 
 def write_rows(rows, path: Path) -> None:
