@@ -50,14 +50,17 @@ def read_yolo_classes(label_path: Path) -> set[int]:
     return {int(line.split()[0]) for line in label_path.read_text().splitlines() if line.strip()}
 
 
-def write_predictions(rows: Iterable[Mapping], path: Path) -> int:
-    """평가 CLI(`ml/scripts/evaluate.py`)가 읽는 형식으로 쓴다."""
+def write_predictions(rows: Iterable[Mapping], path: Path, fmt: str = ".6f") -> int:
+    """평가 CLI(`ml/scripts/evaluate.py`)가 읽는 형식으로 쓴다.
+
+    fmt 는 점수 서식이다. 아주 작은 점수가 많으면(#43) 고정 소수점은 0 으로 뭉치므로 ".9g" 처럼 유효숫자로 쓴다.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=FIELDS)
         writer.writeheader()
         for row in rows:
-            writer.writerow({**row, "score": f"{row['score']:.6f}"})
+            writer.writerow({**row, "score": format(row["score"], fmt)})
             n += 1
     return n

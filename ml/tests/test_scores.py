@@ -56,3 +56,15 @@ def test_written_predictions_are_readable_by_the_evaluation_cli(tmp_path):
     read = read_predictions(path)
     assert len(read) == 6
     assert {(r["image_id"], r["item"]) for r in read} == {(i, n) for i in "ab" for n in NAMES}
+
+
+def test_significant_digit_format_keeps_tiny_scores_apart(tmp_path):
+    rows = [{"image_id": "a", "item": "Gun", "y_true": 1, "score": 3.2e-8},
+            {"image_id": "b", "item": "Gun", "y_true": 0, "score": 1.1e-9}]
+    path = tmp_path / "p.csv"
+    scores.write_predictions(rows, path, fmt=".9g")
+    got = {r["image_id"]: r["score"] for r in read_predictions(path)}
+    assert got["a"] > got["b"] > 0
+    # 기본 서식이면 둘 다 0 으로 뭉친다
+    scores.write_predictions(rows, path)
+    assert {r["score"] for r in read_predictions(path)} == {0.0}
