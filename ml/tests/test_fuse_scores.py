@@ -28,7 +28,7 @@ def test_fuses_every_split_with_max_and_writes_selection(tmp_path):
     for split in SPLITS:
         lines = (out / f"{split}.csv").read_text().splitlines()
         assert lines[0] == "image_id,item,y_true,score"
-        assert f"{split}1,Gun,1,0.800000" in lines and f"{split}1,Knife,0,0.900000" in lines
+        assert f"{split}1,Gun,1,0.8" in lines and f"{split}1,Knife,0,0.9" in lines
     sel = json.loads((out / "selection.json").read_text())
     assert sel["chosen"]["Gun"] == ["a", "b"]
 
@@ -44,3 +44,14 @@ def test_calib_ap_selection_and_bad_inputs(tmp_path):
 
     assert _run("--model", f"a={tmp_path / 'a'}", "--out", out).returncode != 0
     assert "형식은" in _run("--model", "a", "--model", "b=x", "--out", out).stderr
+
+
+def test_tiny_dense_scores_are_not_rounded_to_zero(tmp_path):
+    for name, gun in (("a", "3.2e-08"), ("b", "1.1e-09")):
+        folder = tmp_path / name
+        folder.mkdir()
+        for split in SPLITS:
+            (folder / f"{split}.csv").write_text(f"image_id,item,y_true,score\n{split}1,Gun,1,{gun}\n{split}2,Gun,0,1e-10\n")
+    out = tmp_path / "out"
+    assert _run("--model", f"a={tmp_path / 'a'}", "--model", f"b={tmp_path / 'b'}", "--out", out).returncode == 0
+    assert "calib1,Gun,1,3.2e-08" in (out / "calib.csv").read_text().splitlines()
