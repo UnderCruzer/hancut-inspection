@@ -86,7 +86,8 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     for split in SPLITS:
         by_model = calib if split == "calib" else load(models, split)
-        n = scores.write_predictions(fusion.fuse(by_model, chosen), args.out / f"{split}.csv")
+        # dense 점수(#43)는 아주 작은 값이 많아 소수 6자리로 쓰면 0 으로 뭉친다
+        n = scores.write_predictions(fusion.fuse(by_model, chosen), args.out / f"{split}.csv", fmt=".9g")
         print(f"{split}: {n:,}행")
     (args.out / "selection.json").write_text(json.dumps(
         {"select": args.select, "min_gain": args.min_gain, "models": {k: str(v) for k, v in models.items()},
