@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "score_method": "yolo_class_max_pre_nms",
+  "preprocess": "letterbox_square_bgr_to_rgb_float32_v1",
+  "imgsz": 640,
+  "ultralytics_version": "8.4.164",
+  "class_names": [
+    "Baton",
+    "Pliers",
+    "Hammer",
+    "Powerbank",
+    "Scissors",
+    "Wrench",
+    "Gun",
+    "Bullet",
+    "Sprayer",
+    "HandCuffs",
+    "Knife",
+    "Lighter"
+  ],
+  "batch_size": 1,
+  "cudnn_allow_tf32": false,
+  "cuda_matmul_allow_tf32": false,
+  "weights_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754",
+  "purpose": "exploratory",
+  "thresholds": {
+    "Baton": {
+      "low": 0.0,
+      "high": 0.18005307,
+      "miss_rate_cap": 0.05
+    },
+    "Bullet": {
+      "low": 9.09866721e-05,
+      "high": 0.496406108,
+      "miss_rate_cap": 0.05
+    },
+    "Gun": {
+      "low": 3.41299128e-05,
+      "high": 0.0227693617,
+      "miss_rate_cap": 0.05
+    },
+    "Hammer": {
+      "low": 0.000152981898,
+      "high": 0.108627945,
+      "miss_rate_cap": 0.05
+    },
+    "HandCuffs": {
+      "low": 0.000638998346,
+      "high": 0.825041056,
+      "miss_rate_cap": 0.05
+    },
+    "Knife": {
+      "low": 1.1220257e-05,
+      "high": 0.0849666372,
+      "miss_rate_cap": 0.05
+    },
+    "Lighter": {
+      "low": 6.49155263e-05,
+      "high": 0.252584279,
+      "miss_rate_cap": 0.05
+    },
+    "Pliers": {
+      "low": 0.00140173919,
+      "high": 0.896292448,
+      "miss_rate_cap": 0.05
+    },
+    "Powerbank": {
+      "low": 5.11889084e-06,
+      "high": 0.227804765,
+      "miss_rate_cap": 0.05
+    },
+    "Scissors": {
+      "low": 0.00685484847,
+      "high": 0.416553974,
+      "miss_rate_cap": 0.05
+    },
+    "Sprayer": {
+      "low": 1.76099456e-05,
+      "high": 0.0870049745,
+      "miss_rate_cap": 0.05
+    },
+    "Wrench": {
+      "low": 0.00203190255,
+      "high": 0.796755672,
+      "miss_rate_cap": 0.05
+    },
+    "default": {
+      "low": 8.69343567e-05,
+      "high": 0.0636117309,
+      "miss_rate_cap": 0.05
+    }
+  },
+  "calibration": {
+    "seed": 0,
+    "fraction": 0.5,
+    "delta": 0.001388888888888889,
+    "miss_rate_cap": 0.05,
+    "prediction_sha256": {
+      "test_easy.csv": "34e4cc85f29bd608d4770ca7aacae253d9de5c507ac0ea143f2b5f79f8b855cf",
+      "test_hard.csv": "b51e8aa5f29388e3b41e9b393a064e2777dbbb01afd129b152d59840ff2cb739",
+      "test_hidden.csv": "f4b61ee8aef7fea3a961962b9b55b7cb1f7dd784dbbf264ebaf94d43a88f1621"
+    },
+    "n_calibration_images": 9111,
+    "n_evaluation_images": 9109
+  }
+}
