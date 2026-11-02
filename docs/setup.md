@@ -243,3 +243,28 @@ for a in e1_960 all3 calib_ap; do for c in 0.01 0.02 0.05; do python3 ml/scripts
 ```
 
 `calib-ap` 의 품목별 선택은 학습 분할 calib(2,944장)에서만 정해진다. 시험 결과를 보고 바꾸지 않는다.
+
+## X-ray 합성 학습 (#52, AWS 인스턴스)
+
+설계와 채택 기준은 `ml/configs/tip_20261102.json` 에 학습 전에 고정했다. 먼저 작게 만들어 미리보기를 눈으로 확인한다.
+미리보기 사진은 `data/` 아래에 있어 커밋되지 않는다.
+
+```bash
+python3 ml/scripts/make_tip_train.py --count 200 --name train_tipcheck --preview 24   # data/yolo/train_tipcheck_preview/
+python3 ml/scripts/make_tip_train.py                                                  # 합성 12,500장
+```
+
+마스크가 RLE 면 `pycocotools` 가 필요하다. 학습은 E1 과 같은 조건이고 다른 것은 학습 사진뿐이다.
+
+```bash
+yolo detect train data=data/yolo/pidray_tip.yaml model=yolo11s.pt imgsz=640 epochs=50 patience=15 batch=32 workers=4 device=0 project=$PWD/ml/runs/detect name=tip
+```
+
+대조군은 E1 dense 점수다. 같은 추출 조건(batch 32)으로 비교한다.
+
+```bash
+OUT=ml/runs/tip_20261102
+python3 ml/scripts/predict_dense_scores.py ml/runs/detect/tip/weights/best.pt --out-dir $OUT/scores --compare-dir ml/runs/predictions
+python3 ml/scripts/f_seeds.py --arm E1=ml/runs/dense_20261019/e1/dense --arm TIP=$OUT/scores/dense --out $OUT/f_seeds
+python3 ml/scripts/eval_detector.py --weights ml/runs/detect/tip/weights/best.pt
+```
