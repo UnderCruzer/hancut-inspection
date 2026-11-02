@@ -8,6 +8,8 @@
 from __future__ import annotations
 
 import os
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, File, HTTPException, Request, UploadFile
@@ -15,6 +17,8 @@ from pydantic import BaseModel
 
 from app import judgment
 from app.predictor import Predictor
+from app import dense_api
+from app.dense import DenseBundle, DensePredictor
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
@@ -78,14 +82,32 @@ async def judge(request: Request, image: UploadFile = File(...)) -> JudgmentResp
     )
 
 
-def create_app(predictor: Predictor | None = None, thresholds_path: Path | None = None) -> FastAPI:
-    app = FastAPI(title="한컷점검 판정 API", version="0.1.0")
+def create_app(predictor: Predictor | None = None, thresholds_path: Path | None = None,
+               *, dense_predictor=None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app):
+        if app.state.dense_predictor is None:
+            weights, bundle = os.getenv("DENSE_WEIGHTS_PATH"), os.getenv("DENSE_BUNDLE_PATH")
+            if weights or bundle:
+                try:
+                    if not weights or not bundle:
+                        raise ValueError("DENSE_WEIGHTS_PATH와 DENSE_BUNDLE_PATH가 모두 필요하다")
+                    app.state.dense_predictor = DensePredictor(
+                        Path(weights), DenseBundle.load(Path(bundle)), os.getenv("DENSE_DEVICE", "cpu"))
+                except Exception:
+                    logging.getLogger(__name__).exception("dense 모델 로드 실패; v2는 503 반환")
+        yield
+
+    app = FastAPI(title="한컷점검 판정 API", version="0.2.0", lifespan=lifespan)
     app.state.predictor = predictor
+    app.state.dense_predictor = dense_predictor
+    app.state.max_upload_bytes = MAX_UPLOAD_BYTES
 
     path = thresholds_path or Path(os.getenv("THRESHOLDS_PATH", "models/thresholds.json"))
     app.state.thresholds = judgment.load_thresholds(path) if path.exists() else None
 
     app.include_router(router)
+    app.include_router(dense_api.router)
     return app
 
 
