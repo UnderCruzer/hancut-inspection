@@ -264,7 +264,7 @@ yolo detect train data=data/yolo/pidray_tip.yaml model=yolo11s.pt imgsz=640 epoc
 
 ```bash
 OUT=ml/runs/tip_20261102
-python3 ml/scripts/predict_dense_scores.py ml/runs/detect/tip/weights/best.pt --out-dir $OUT/scores --compare-dir ml/runs/predictions
+python3 ml/scripts/predict_dense_scores.py ml/runs/detect/tip/weights/best.pt --out-dir $OUT/scores
 python3 ml/scripts/f_seeds.py --arm E1=ml/runs/dense_20261019/e1/dense --arm TIP=$OUT/scores/dense --out $OUT/f_seeds
 python3 ml/scripts/eval_detector.py --weights ml/runs/detect/tip/weights/best.pt
 ```
