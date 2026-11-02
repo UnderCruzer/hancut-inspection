@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -24,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from hancut.config import load_items  # noqa: E402
 from hancut.data import yolo  # noqa: E402
 from hancut.eval import cli, dense, scores  # noqa: E402
+from hancut.eval.bundle import prediction_manifest  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data" / "yolo"
@@ -49,14 +51,23 @@ def main() -> int:
     parser.add_argument("--compare-dir", type=Path, help="기존 predict_scores.py 출력 폴더 — nms 재현 확인용")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--ieee-fp32", action="store_true", help="TF32 끄기. API 보정에는 --batch 1과 함께 사용")
     parser.add_argument("--conf", type=float, default=0.001, help="nms 쪽 신뢰도 하한 (predict_scores.py 와 같게)")
     parser.add_argument("--iou", type=float, default=0.7, help="nms IoU (ultralytics predict 기본값)")
     parser.add_argument("--device", default="0")
     args = parser.parse_args()
+    if args.batch < 1:
+        parser.error("batch는 1 이상이어야 한다")
+    if args.out_dir.exists():
+        parser.error("기존 예측/manifest와 섞이지 않도록 새 out-dir을 지정하세요")
 
     import cv2
     import numpy as np
     import torch
+    import ultralytics
+    if args.ieee_fp32:
+        torch.backends.cudnn.allow_tf32 = False
+        torch.backends.cuda.matmul.allow_tf32 = False
     from ultralytics import YOLO
     from ultralytics.data.augment import LetterBox
     try:
@@ -124,6 +135,14 @@ def main() -> int:
         lines += ["", f"## 품목별 p₀ — 시험 {', '.join(tests)} 전체", ""] + p0_table(n_rows, d_rows, names)
     report = "\n".join(lines) + "\n"
     (args.out_dir / "summary.md").write_text(report, encoding="utf-8")
+    if bad == 0:
+        manifest = prediction_manifest(args.out_dir / "dense", args.weights, names,
+                                       args.imgsz, ultralytics.__version__, args.splits,
+                                       batch_size=args.batch,
+                                       cudnn_allow_tf32=torch.backends.cudnn.allow_tf32,
+                                       cuda_matmul_allow_tf32=torch.backends.cuda.matmul.allow_tf32)
+        (args.out_dir / "dense" / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + report)
     return 0 if bad == 0 else 1
 

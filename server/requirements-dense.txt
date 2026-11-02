@@ -1,0 +1,3 @@
+# GPU에서는 해당 CUDA에 맞는 torch를 먼저 설치한다.
+-r requirements.txt
+ultralytics==8.4.164
