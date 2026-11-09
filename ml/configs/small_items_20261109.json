@@ -1,0 +1,33 @@
+{
+  "experiment": "Separate detector for small items only (Lighter, Bullet); its dense scores replace E1's for those items",
+  "seed": 0,
+  "small_items": {
+    "rule": "train box side (sqrt of area) at 640 input, median below 100 px",
+    "measured_median_px": {"Bullet": 69.3, "Lighter": 77.7, "next_smallest_Gun": 112.5},
+    "items": ["Lighter", "Bullet"]
+  },
+  "train": {"model": "yolo11s.pt", "pretrained_sha256": "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5",
+            "data": "data/yolo/pidray_small.yaml", "imgsz": 960, "epochs": 50, "patience": 15, "batch": 32, "workers": 4, "device": 0},
+  "change": "labels keep Lighter and Bullet only on train and val; all images kept, other items become background; class names and indices unchanged",
+  "expected_counts": {"train": 25039, "val": 1474, "calib": 2944, "test_easy": 9482, "test_hard": 3733, "test_hidden": 5005},
+  "scores": {"extraction": "predict_dense_scores.py, batch 32, imgsz 960 (same as the 960 control)",
+             "combine": "fuse_scores.py --select use: Lighter and Bullet from the small model, the other 10 items from E1"},
+  "arms": {
+    "E1": {"dense": "ml/runs/dense_20261019/e1/dense", "weights_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754"},
+    "E1+960": {"dense": "Lighter and Bullet from ml/runs/dense_fusion_20261020/960/dense",
+               "weights_sha256": "791b7454881f3ae5bd488f9cadca9f7055e719bac78b82a598203c92098ff7f0",
+               "note": "12-item model, same imgsz 960 and pretrained start; separates the effect of training apart from resolution"},
+    "E1+small": {"dense": "Lighter and Bullet from the small model"}
+  },
+  "gate": {
+    "setting": "F, cap 5%, delta 0.05/36, seeds 0-9, dense scores, arm E1+small",
+    "hidden_ap50_at_least": {"Lighter": 0.300, "Bullet": 0.471},
+    "hidden_ap50_basis": "12-item 960 control 0.275 and 0.446, plus 0.025",
+    "over_cap_runs": 0,
+    "auto_rate_mean_at_least": 0.588,
+    "auto_rate_mean_above_arm": "E1+960"
+  },
+  "also_report": ["recall by size bin per item (size_recall.py, conf 0.25)", "Lighter and Bullet review rate", "flagged items per reviewed bag",
+                  "second model doubles inference per image"],
+  "caveat": "The gate reads the repeatedly used PIDray test set, so a pass is exploratory and not independent validation. Thresholds in this file are fixed before training and are not changed after seeing results."
+}
