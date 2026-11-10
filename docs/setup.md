@@ -268,3 +268,28 @@ python3 ml/scripts/predict_dense_scores.py ml/runs/detect/tip/weights/best.pt --
 python3 ml/scripts/f_seeds.py --arm E1=ml/runs/dense_20261019/e1/dense --arm TIP=$OUT/scores/dense --out $OUT/f_seeds
 python3 ml/scripts/eval_detector.py --weights ml/runs/detect/tip/weights/best.pt
 ```
+
+## 작은 품목 전용 검출기 (#54, AWS 인스턴스)
+
+설계와 채택 기준은 `ml/configs/small_items_20261109.json` 에 학습 전에 고정했다.
+작은 품목은 학습 박스 한 변 중앙값(640 입력 기준)이 100px 미만인 라이터 · 탄약이다.
+
+```bash
+python3 ml/scripts/make_item_subset.py --items Lighter Bullet    # train_small · val_small · pidray_small.yaml
+yolo detect train data=data/yolo/pidray_small.yaml model=yolo11s.pt imgsz=960 epochs=50 patience=15 batch=32 workers=4 device=0 project=$PWD/ml/runs/detect name=small960
+```
+
+12종 960 재학습(#37)과 데이터만 다르다. 점수는 같은 조건(batch 32, imgsz 960)으로 뽑고, 라이터 · 탄약만 E1 점수와 바꿔 끼운다.
+
+```bash
+OUT=ml/runs/small_items_20261109
+E1=ml/runs/dense_20261019/e1/dense; M960=ml/runs/dense_fusion_20261020/960/dense
+python3 ml/scripts/predict_dense_scores.py ml/runs/detect/small960/weights/best.pt --imgsz 960 --out-dir $OUT/scores
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model small=$OUT/scores/dense --select use --use Lighter=small --use Bullet=small --out $OUT/e1_small
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model 960=$M960 --select use --use Lighter=960 --use Bullet=960 --out $OUT/e1_960
+python3 ml/scripts/f_seeds.py --arm E1=$E1 --arm E1+960=$OUT/e1_960 --arm E1+small=$OUT/e1_small --out $OUT/f_seeds
+python3 ml/scripts/eval_detector.py --weights ml/runs/detect/small960/weights/best.pt --imgsz 960
+python3 ml/scripts/size_recall.py --weights ml/runs/detect/e1_smoke/weights/best.pt --name E1 --items Lighter Bullet --out-dir $OUT/sizes_E1
+```
+
+전용 모델의 `eval_detector.py` 결과에서는 라이터 · 탄약만 읽는다. 나머지 10종은 배경으로 배워 0 에 가깝다.

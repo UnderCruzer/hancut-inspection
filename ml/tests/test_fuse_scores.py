@@ -55,3 +55,20 @@ def test_tiny_dense_scores_are_not_rounded_to_zero(tmp_path):
     out = tmp_path / "out"
     assert _run("--model", f"a={tmp_path / 'a'}", "--model", f"b={tmp_path / 'b'}", "--out", out).returncode == 0
     assert "calib1,Gun,1,3.2e-08" in (out / "calib.csv").read_text().splitlines()
+
+
+def test_use_replaces_named_items_without_taking_the_max(tmp_path):
+    _write(tmp_path / "a", 0.2, 0.9)
+    _write(tmp_path / "b", 0.8, 0.1)
+    out = tmp_path / "out"
+    result = _run("--model", f"a={tmp_path / 'a'}", "--model", f"b={tmp_path / 'b'}",
+                  "--select", "use", "--use", "Knife=b", "--out", out)
+    assert result.returncode == 0, result.stderr
+    lines = (out / "calib.csv").read_text().splitlines()
+    assert "calib1,Gun,1,0.2" in lines and "calib1,Knife,0,0.1" in lines  # Gun 은 a 그대로, Knife 는 b 로 교체
+    assert json.loads((out / "selection.json").read_text())["chosen"] == {"Gun": ["a"], "Knife": ["b"]}
+
+    base = ("--model", f"a={tmp_path / 'a'}", "--model", f"b={tmp_path / 'b'}", "--select", "use", "--out", out)
+    assert "하나 이상" in _run(*base).stderr
+    assert "모르는 모델" in _run(*base, "--use", "Knife=c").stderr
+    assert "형식은 품목=모델" in _run(*base, "--use", "Knife").stderr

@@ -91,6 +91,21 @@ def select_by_ap(
     return chosen, table
 
 
+def assign(items: Iterable[str], models: Sequence[str], uses: Mapping[str, str]) -> dict[str, tuple[str, ...]]:
+    """
+    품목마다 모델 하나를 정해 준다 (#54). uses 에 없는 품목은 첫 모델을 쓴다.
+    최댓값으로 섞지 않고 바꿔 끼운다 — 작은 품목만 전용 모델 점수로 교체할 때 쓴다.
+    """
+    items = list(items)
+    unknown_items = sorted(set(uses) - set(items))
+    if unknown_items:
+        raise ValueError(f"모르는 품목: {unknown_items}")
+    unknown_models = sorted(set(uses.values()) - set(models))
+    if unknown_models:
+        raise ValueError(f"모르는 모델: {unknown_models}")
+    return {item: (uses.get(item, models[0]),) for item in items}
+
+
 def fuse(
     by_model: Mapping[str, Mapping[Key, tuple[int, float]]],
     chosen: Mapping[str, Sequence[str]],

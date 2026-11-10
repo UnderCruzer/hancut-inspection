@@ -12,6 +12,10 @@
 
 --select all       모든 품목에 모든 모델의 최댓값
 --select calib-ap  품목마다 쓸 모델 조합을 calib(학습 분할) AP 로 고른다. 시험셋은 보지 않는다
+--select use       --use 품목=모델 로 정한 품목만 그 모델 점수로 바꾸고, 나머지는 첫 모델 (#54)
+
+    python3 ml/scripts/fuse_scores.py --model E1=$E1 --model small=$SMALL \\
+        --select use --use Lighter=small --use Bullet=small --out $OUT/e1_small
 """
 from __future__ import annotations
 
@@ -38,6 +42,18 @@ def parse_models(specs: list[str]) -> dict[str, Path]:
         out[name] = Path(path)
     if len(out) < 2:
         raise SystemExit("모델이 둘 이상 있어야 합친다")
+    return out
+
+
+def parse_uses(specs: list[str]) -> dict[str, str]:
+    if not specs:
+        raise SystemExit("--select use 에는 --use 품목=모델 이 하나 이상 필요하다")
+    out = {}
+    for spec in specs:
+        item, sep, model = spec.partition("=")
+        if not sep or not item or not model:
+            raise SystemExit(f"'{spec}' 를 읽지 못했다. 형식은 품목=모델")
+        out[item] = model
     return out
 
 
@@ -70,7 +86,8 @@ def report(models, chosen, table, select: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--model", action="append", required=True, help="이름=예측 폴더 (두 번 이상)")
-    parser.add_argument("--select", choices=("all", "calib-ap"), default="all")
+    parser.add_argument("--select", choices=("all", "calib-ap", "use"), default="all")
+    parser.add_argument("--use", action="append", default=[], help="품목=모델 (--select use, 여러 번)")
     parser.add_argument("--min-gain", type=float, default=0.001, help="모델을 더 쓰려면 calib AP 가 이만큼 넘게 올라야 한다")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -80,6 +97,12 @@ def main() -> int:
     items = sorted({k[1] for k in next(iter(calib.values()))})
     if args.select == "calib-ap":
         chosen, table = fusion.select_by_ap(calib, items, args.min_gain)
+    elif args.select == "use":
+        uses = parse_uses(args.use)
+        try:
+            chosen, table = fusion.assign(items, list(models), uses), {}
+        except ValueError as e:
+            raise SystemExit(str(e)) from None
     else:
         chosen, table = {i: tuple(models) for i in items}, {}
 

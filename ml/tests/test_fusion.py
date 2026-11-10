@@ -48,3 +48,11 @@ def test_select_by_ap_keeps_the_smaller_combo_on_a_tie():
     b = _model([("1", "Gun", 1, 0.8), ("2", "Gun", 0, 0.2)])
     chosen, _ = fusion.select_by_ap({"a": a, "b": b}, ["Gun"])
     assert chosen["Gun"] == ("a",)
+
+
+def test_assign_swaps_only_the_named_items_and_rejects_unknown_names():
+    assert fusion.assign(["Gun", "Lighter"], ["E1", "small"], {"Lighter": "small"}) == {"Gun": ("E1",), "Lighter": ("small",)}
+    with pytest.raises(ValueError, match="모르는 품목"):
+        fusion.assign(["Gun"], ["E1", "small"], {"Sword": "small"})
+    with pytest.raises(ValueError, match="모르는 모델"):
+        fusion.assign(["Gun"], ["E1", "small"], {"Gun": "big"})
