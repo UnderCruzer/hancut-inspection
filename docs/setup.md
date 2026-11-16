@@ -293,3 +293,24 @@ python3 ml/scripts/size_recall.py --weights ml/runs/detect/e1_smoke/weights/best
 ```
 
 전용 모델의 `eval_detector.py` 결과에서는 라이터 · 탄약만 읽는다. 나머지 10종은 배경으로 배워 0 에 가깝다.
+
+## 사진 단위 품목 분류기 (#56, AWS 인스턴스)
+
+설계와 채택 기준은 `ml/configs/presence_20261116.json` 에 학습 전에 고정했다.
+사진 전체를 보고 12종마다 있을 확률을 내는 EfficientNet-B0 이다. 박스는 내지 않는다.
+처음 실행할 때 torchvision 이 ImageNet 사전학습 가중치를 받는다.
+
+```bash
+OUT=ml/runs/presence_20261116
+python3 ml/scripts/train_presence.py --config ml/configs/presence_20261116.json --out $OUT/smoke --limit 64 --epochs 1   # 동작 확인
+python3 ml/scripts/train_presence.py --config ml/configs/presence_20261116.json --out $OUT/cls
+```
+
+분류기 점수는 라이터 · 탄약만 E1 dense 점수에 보탠다. 두 점수는 척도가 달라 calib 음성 기준 z 점수로 맞춘 뒤 최댓값을 취한다.
+
+```bash
+E1=ml/runs/dense_20261019/e1/dense; CLS=$OUT/cls/scores
+python3 ml/scripts/fuse_scores.py --model E1=$E1 --model cls=$CLS --select add --add Lighter=cls --add Bullet=cls --norm neg-z --out $OUT/e1_cls
+python3 ml/scripts/f_seeds.py --arm E1=$E1 --arm E1+cls=$OUT/e1_cls --out $OUT/f_seeds
+python3 ml/scripts/image_ap.py --arm E1=$E1 --arm cls=$CLS --arm E1+cls=$OUT/e1_cls --items Lighter Bullet --out $OUT/image_ap.md
+```

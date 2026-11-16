@@ -13,9 +13,13 @@
 --select all       모든 품목에 모든 모델의 최댓값
 --select calib-ap  품목마다 쓸 모델 조합을 calib(학습 분할) AP 로 고른다. 시험셋은 보지 않는다
 --select use       --use 품목=모델 로 정한 품목만 그 모델 점수로 바꾸고, 나머지는 첫 모델 (#54)
+--select add       --add 품목=모델 로 정한 품목만 첫 모델과 그 모델의 최댓값, 나머지는 첫 모델 (#56)
+--norm neg-z       섞는 품목의 점수를 모델마다 calib 음성 기준 z 점수로 맞춘 뒤 최댓값을 취한다 (#56)
 
     python3 ml/scripts/fuse_scores.py --model E1=$E1 --model small=$SMALL \\
         --select use --use Lighter=small --use Bullet=small --out $OUT/e1_small
+    python3 ml/scripts/fuse_scores.py --model E1=$E1 --model cls=$CLS \\
+        --select add --add Lighter=cls --add Bullet=cls --norm neg-z --out $OUT/e1_cls
 """
 from __future__ import annotations
 
@@ -45,9 +49,9 @@ def parse_models(specs: list[str]) -> dict[str, Path]:
     return out
 
 
-def parse_uses(specs: list[str]) -> dict[str, str]:
+def parse_uses(specs: list[str], flag: str = "use") -> dict[str, str]:
     if not specs:
-        raise SystemExit("--select use 에는 --use 품목=모델 이 하나 이상 필요하다")
+        raise SystemExit(f"--select {flag} 에는 --{flag} 품목=모델 이 하나 이상 필요하다")
     out = {}
     for spec in specs:
         item, sep, model = spec.partition("=")
@@ -68,9 +72,9 @@ def load(models: dict[str, Path], split: str) -> dict[str, dict]:
     return by_model
 
 
-def report(models, chosen, table, select: str) -> str:
+def report(models, chosen, table, select: str, norm: str = "none") -> str:
     names = list(models)
-    lines = ["# 점수 결합 (#41)", "", f"방식: 품목별 이미지 점수 최댓값 · 선택 `{select}`", "",
+    lines = ["# 점수 결합 (#41)", "", f"방식: 품목별 이미지 점수 최댓값 · 선택 `{select}` · 척도 `{norm}`", "",
              "| 모델 | 예측 폴더 |", "|---|---|"] + [f"| {n} | `{p}` |" for n, p in models.items()]
     lines += ["", "## 품목별로 쓴 모델", "", "| 품목 | 쓴 모델 | " + " | ".join(f"calib AP {n}" for n in names) + " | calib AP 결합 |",
               "|---|---|" + "---:|" * (len(names) + 1)]
@@ -86,8 +90,10 @@ def report(models, chosen, table, select: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--model", action="append", required=True, help="이름=예측 폴더 (두 번 이상)")
-    parser.add_argument("--select", choices=("all", "calib-ap", "use"), default="all")
+    parser.add_argument("--select", choices=("all", "calib-ap", "use", "add"), default="all")
     parser.add_argument("--use", action="append", default=[], help="품목=모델 (--select use, 여러 번)")
+    parser.add_argument("--add", action="append", default=[], help="품목=모델 (--select add, 여러 번)")
+    parser.add_argument("--norm", choices=("none", "neg-z"), default="none", help="섞기 전에 점수 척도 맞추기")
     parser.add_argument("--min-gain", type=float, default=0.001, help="모델을 더 쓰려면 calib AP 가 이만큼 넘게 올라야 한다")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -97,25 +103,38 @@ def main() -> int:
     items = sorted({k[1] for k in next(iter(calib.values()))})
     if args.select == "calib-ap":
         chosen, table = fusion.select_by_ap(calib, items, args.min_gain)
-    elif args.select == "use":
-        uses = parse_uses(args.use)
+    elif args.select in ("use", "add"):
+        uses = parse_uses(getattr(args, args.select), args.select)
+        pick = fusion.assign if args.select == "use" else fusion.add
         try:
-            chosen, table = fusion.assign(items, list(models), uses), {}
+            chosen, table = pick(items, list(models), uses), {}
         except ValueError as e:
             raise SystemExit(str(e)) from None
     else:
         chosen, table = {i: tuple(models) for i in items}, {}
 
+    params = {}
+    if args.norm == "neg-z":
+        mixed = [i for i in items if len(chosen[i]) > 1]
+        try:
+            params = {m: fusion.neg_z_params(calib[m], mixed) for m in models}
+        except ValueError as e:
+            raise SystemExit(str(e)) from None
+
     args.out.mkdir(parents=True, exist_ok=True)
     for split in SPLITS:
         by_model = calib if split == "calib" else load(models, split)
+        if params:
+            by_model = fusion.normalize(by_model, params, chosen)
         # dense 점수(#43)는 아주 작은 값이 많아 소수 6자리로 쓰면 0 으로 뭉친다
         n = scores.write_predictions(fusion.fuse(by_model, chosen), args.out / f"{split}.csv", fmt=".9g")
         print(f"{split}: {n:,}행")
     (args.out / "selection.json").write_text(json.dumps(
         {"select": args.select, "min_gain": args.min_gain, "models": {k: str(v) for k, v in models.items()},
-         "chosen": {k: list(v) for k, v in chosen.items()}}, ensure_ascii=False, indent=2), encoding="utf-8")
-    text = report(models, chosen, table, args.select)
+         "chosen": {k: list(v) for k, v in chosen.items()}, "norm": args.norm,
+         "neg_z_params": {m: {i: list(p) for i, p in ps.items()} for m, ps in params.items()}},
+        ensure_ascii=False, indent=2), encoding="utf-8")
+    text = report(models, chosen, table, args.select, args.norm)
     (args.out / "summary.md").write_text(text, encoding="utf-8")
     print("\n" + text + f"\n저장: {args.out}")
     return 0

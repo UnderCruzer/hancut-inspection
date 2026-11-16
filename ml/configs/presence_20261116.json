@@ -1,0 +1,28 @@
+{
+  "experiment": "Image-level multi-label item classifier; its scores are added (max after neg-z scaling) to E1 dense scores for Lighter and Bullet",
+  "seed": 0,
+  "train": {"model": "efficientnet_b0", "pretrained": "IMAGENET1K_V1", "imgsz": 640, "epochs": 12, "batch": 32, "workers": 8,
+            "lr": 0.0003, "weight_decay": 0.0001, "hflip": 0.5, "seed": 0,
+            "loss": "BCEWithLogits over 12 items", "selection": "val mean image AP over 12 items"},
+  "data": "train for weights, val for epoch selection; calib and test splits are only scored after training",
+  "expected_counts": {"train": 25039, "val": 1474, "calib": 2944, "test_easy": 9482, "test_hard": 3733, "test_hidden": 5005},
+  "combine": {"script": "fuse_scores.py --select add --norm neg-z",
+              "norm": "per model and item: z = (logit(score) - mean) / sd of calib negatives, then sigmoid; only items that mix models",
+              "items": ["Lighter", "Bullet"]},
+  "arms": {
+    "E1": {"dense": "ml/runs/dense_20261019/e1/dense", "weights_sha256": "2d41d3d38914c27f5275b664dc4a6747435d31acae231fc717c1a217d5622754"},
+    "E1+cls": "Lighter and Bullet: max of E1 dense and classifier after neg-z; other 10 items E1",
+    "E1+cls-all": "reference only: all 12 items added",
+    "E1<-cls": "reference only: Lighter and Bullet replaced by classifier scores"
+  },
+  "gate": {
+    "setting": "F, cap 5%, delta 0.05/36, seeds 0-9, arm E1+cls",
+    "auto_rate_mean_at_least": 0.588,
+    "over_cap_runs": 0,
+    "hidden_image_ap": {"Lighter": "at least E1 + 0.02", "Bullet": "at least E1"}
+  },
+  "also_report": ["image AP per item on easy, hard, hidden", "paired auto-rate difference per seed", "Lighter and Bullet review rate",
+                  "reference arms", "second network doubles inference per image"],
+  "deadline": "decide by 2026-11-19; reject and record if the gate is not met",
+  "caveat": "The gate reads the repeatedly used PIDray test set, so a pass is exploratory and not independent validation. Thresholds in this file are fixed before training and are not changed after seeing results."
+}
