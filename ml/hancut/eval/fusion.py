@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import math
+import statistics
 from itertools import combinations
 from typing import Iterable, Mapping, Sequence
 
@@ -104,6 +106,61 @@ def assign(items: Iterable[str], models: Sequence[str], uses: Mapping[str, str])
     if unknown_models:
         raise ValueError(f"모르는 모델: {unknown_models}")
     return {item: (uses.get(item, models[0]),) for item in items}
+
+
+def add(items: Iterable[str], models: Sequence[str], adds: Mapping[str, str]) -> dict[str, tuple[str, ...]]:
+    """
+    고른 품목만 첫 모델과 그 모델의 최댓값으로 보탠다 (#56). 나머지는 첫 모델만 쓴다.
+    #54 에서 바꿔 끼우면 손해, 최댓값으로 보태면 이득이었다.
+    """
+    items = list(items)
+    assign(items, models, adds)  # 이름 검사
+    return {item: (models[0],) if adds.get(item, models[0]) == models[0] else (models[0], adds[item]) for item in items}
+
+
+def _logit(p: float, eps: float = 1e-12) -> float:
+    p = min(max(p, eps), 1 - eps)
+    return math.log(p / (1 - p))
+
+
+def _sigmoid(z: float) -> float:
+    if z >= 0:
+        return 1 / (1 + math.exp(-z))
+    e = math.exp(z)
+    return e / (1 + e)
+
+
+def neg_z_params(rows: Mapping[Key, tuple[int, float]], items: Iterable[str]) -> dict[str, tuple[float, float]]:
+    """
+    품목마다 calib 음성 점수 logit 의 평균 · 표준편차 (#56).
+    척도가 다른 두 모델을 '배경에 비해 얼마나 튀나' 로 맞춰 최댓값을 취하려는 것이다. calib 은 학습 분할이다.
+    """
+    out = {}
+    for item in items:
+        neg = [_logit(s) for (_, it), (y, s) in rows.items() if it == item and y == 0]
+        if len(neg) < 2:
+            raise ValueError(f"{item}: calib 음성이 둘 이상 있어야 척도를 맞춘다")
+        sd = statistics.pstdev(neg)
+        if sd == 0:
+            raise ValueError(f"{item}: calib 음성 점수가 모두 같아 척도를 맞출 수 없다")
+        out[item] = (statistics.fmean(neg), sd)
+    return out
+
+
+def neg_z(score: float, params: tuple[float, float]) -> float:
+    """z = (logit − 평균) / 표준편차 를 sigmoid 로 0..1 에 되돌린다. 순서는 바뀌지 않는다."""
+    mean, sd = params
+    return _sigmoid((_logit(score) - mean) / sd)
+
+
+def normalize(
+    by_model: Mapping[str, Mapping[Key, tuple[int, float]]],
+    params: Mapping[str, Mapping[str, tuple[float, float]]],
+    chosen: Mapping[str, Sequence[str]],
+) -> dict[str, dict[Key, tuple[int, float]]]:
+    """모델을 둘 이상 섞는 품목만 척도를 맞춘다. 한 모델만 쓰는 품목은 점수를 그대로 둔다."""
+    return {m: {k: (y, neg_z(s, params[m][k[1]]) if len(chosen[k[1]]) > 1 else s) for k, (y, s) in rows.items()}
+            for m, rows in by_model.items()}
 
 
 def fuse(

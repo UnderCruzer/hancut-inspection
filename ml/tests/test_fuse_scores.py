@@ -72,3 +72,24 @@ def test_use_replaces_named_items_without_taking_the_max(tmp_path):
     assert "하나 이상" in _run(*base).stderr
     assert "모르는 모델" in _run(*base, "--use", "Knife=c").stderr
     assert "형식은 품목=모델" in _run(*base, "--use", "Knife").stderr
+
+
+def test_add_takes_the_max_after_neg_z_only_for_named_items(tmp_path):
+    for name, scale in (("a", 1e-4), ("b", 1.0)):
+        folder = tmp_path / name
+        folder.mkdir()
+        for split in SPLITS:
+            (folder / f"{split}.csv").write_text(
+                "image_id,item,y_true,score\n"
+                f"{split}1,Gun,1,{0.9 * scale}\n{split}2,Gun,0,{0.1 * scale}\n{split}3,Gun,0,{0.2 * scale}\n"
+                f"{split}1,Knife,1,0.7\n{split}2,Knife,0,0.2\n{split}3,Knife,0,0.1\n")
+    out = tmp_path / "out"
+    base = ("--model", f"a={tmp_path / 'a'}", "--model", f"b={tmp_path / 'b'}", "--select", "add")
+    result = _run(*base, "--add", "Gun=b", "--norm", "neg-z", "--out", out)
+    assert result.returncode == 0, result.stderr
+    rows = {tuple(line.split(",")[:2]): float(line.split(",")[3]) for line in (out / "test_hidden.csv").read_text().splitlines()[1:]}
+    assert rows[("test_hidden1", "Knife")] == 0.7  # 섞지 않는 품목은 그대로
+    assert rows[("test_hidden2", "Gun")] < rows[("test_hidden1", "Gun")]
+    sel = json.loads((out / "selection.json").read_text())
+    assert sel["chosen"]["Gun"] == ["a", "b"] and sel["norm"] == "neg-z" and set(sel["neg_z_params"]["a"]) == {"Gun"}
+    assert "하나 이상" in _run(*base, "--out", out).stderr
