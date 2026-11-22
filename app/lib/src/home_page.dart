@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -159,7 +160,8 @@ class _ResultView extends StatelessWidget {
   final Inspection result;
 
   String _headline(Inspection r) => switch (r.overall) {
-        JudgmentZone.autoAlarm => '개봉 검사: ${r.inZone(JudgmentZone.autoAlarm).map((e) => e.label).join(', ')}',
+        JudgmentZone.autoAlarm => '개봉 검사: ${r.inZone(JudgmentZone.autoAlarm).map((e) => e.label).join(', ')}'
+            '${r.inZone(JudgmentZone.review).isEmpty ? '' : '\n함께 확인: ${r.inZone(JudgmentZone.review).map((e) => e.label).join(', ')}'}',
         JudgmentZone.review => '판독관 확인 필요: ${r.inZone(JudgmentZone.review).map((e) => e.label).join(', ')}',
         JudgmentZone.autoClear => '12종 모두 기준 아래 — 판독관 확인 없이 통과',
       };
@@ -170,6 +172,7 @@ class _ResultView extends StatelessWidget {
     final overall = result.overall;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(color: overall.color, borderRadius: BorderRadius.circular(16)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -193,12 +196,23 @@ class _ResultView extends StatelessWidget {
       for (final item in result.sorted) _ItemRow(item: item),
       const SizedBox(height: 12),
       Text(
-        '모델 ${result.modelVersion}${result.experimental ? ' · 실험용: PIDray 시험 분포에서 정한 기준이며 실제 공항 장비에서 검증하지 않았습니다' : ''}',
+        '점수 막대는 로그 눈금 · 세로선은 통과/적발 기준 · 모델 ${shortVersion(result.modelVersion)}${result.experimental ? ' · 실험용: PIDray 시험 분포에서 정한 기준이며 실제 공항 장비에서 검증하지 않았습니다' : ''}',
         style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
       ),
     ]);
   }
 }
+
+/// 점수는 0.00001 부터 1 까지 넓게 퍼져 있어서, 막대는 로그 눈금(10^-6 ~ 1)으로 그린다.
+/// 직선 눈금이면 기준선이 모두 왼쪽 끝에 몰려 왜 재검인지 보이지 않는다.
+double scorePosition(double v) {
+  if (v.isNaN || v <= 0) return 0;
+  return ((math.log(v) / math.ln10 + 6) / 6).clamp(0.0, 1.0);
+}
+
+String formatScore(double v) => v >= 0.001 ? v.toStringAsFixed(3) : (v <= 0 ? '0' : v.toStringAsExponential(0));
+
+String shortVersion(String v) => v.startsWith('sha256:') && v.length > 19 ? v.substring(0, 19) : v;
 
 class _ItemRow extends StatelessWidget {
   const _ItemRow({required this.item});
@@ -215,7 +229,7 @@ class _ItemRow extends StatelessWidget {
         Expanded(
           child: LayoutBuilder(builder: (context, box) {
             final w = box.maxWidth;
-            double at(double v) => (v.isNaN ? 0.0 : v.clamp(0.0, 1.0)) * w;
+            double at(double v) => scorePosition(v) * w;
             return SizedBox(
               height: 18,
               child: Stack(children: [
@@ -228,7 +242,7 @@ class _ItemRow extends StatelessWidget {
           }),
         ),
         const SizedBox(width: 10),
-        SizedBox(width: 52, child: Text(item.score.toStringAsFixed(3), textAlign: TextAlign.right, style: t.bodySmall)),
+        SizedBox(width: 60, child: Text(formatScore(item.score), textAlign: TextAlign.right, style: t.bodySmall)),
         const SizedBox(width: 10),
         Container(
           width: 48,

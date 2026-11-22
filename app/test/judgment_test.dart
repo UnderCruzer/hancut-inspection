@@ -121,6 +121,16 @@ void main() {
     });
   });
 
+  test('막대는 로그 눈금, 작은 점수는 지수로 쓴다', () {
+    expect(scorePosition(1), 1);
+    expect(scorePosition(1e-6), closeTo(0, 1e-9));
+    expect(scorePosition(1e-3), closeTo(0.5, 1e-9));
+    expect(scorePosition(0), 0);
+    expect(formatScore(0.4071), '0.407');
+    expect(formatScore(0.00004), '4e-5');
+    expect(shortVersion('sha256:2d41d3d38914c27f5275'), 'sha256:2d41d3d38914');
+  });
+
   testWidgets('사진을 고르면 사진 판정과 품목별 구간을 보여준다', (tester) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
