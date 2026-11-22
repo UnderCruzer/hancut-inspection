@@ -50,6 +50,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.9  # 3.50 이 material.dart 를 deprecated 로 표시해 analyze 가 깨진다 (#58)
           cache: true
       - run: flutter pub get
       - run: flutter analyze
