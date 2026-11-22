@@ -1,4 +1,99 @@
-# 한컷점검 (hancut-inspection)
+# Hancut Inspection (한컷점검)
+
+**Live demo: https://hancut-inspection.vercel.app** · [한국어 본문](#한국어)
+
+> How many X-ray security-screening decisions can an AI take off the screener **while a miss-rate cap still holds for every item and every concealment level?**
+
+Each bag image × each of 12 prohibited items (PIDray) is sorted into one of three zones:
+**auto-clear** (no human needed), **review** (a screener must look), **auto-alarm** (open the bag).
+Thresholds are calibrated so that the miss rate stays under a cap (5%) in all 36 item × difficulty cells.
+Solo AI capstone project.
+
+## Result
+
+| | |
+|---|---|
+| Final model | **E1**: YOLO11s fine-tuned on PIDray (640 px), SHA-256 `2d41d3d3…5622754` |
+| Score rule | **dense**: per item, max class probability over the 8,400 anchors *before* NMS |
+| Calibration | **F**: one threshold pair per item, 95% upper confidence bound on miss rate, holding in easy / hard / hidden at once, Bonferroni δ = 0.05/36 |
+| **Automated at a 5% miss cap** | **57.8%** of image × item decisions (range 55.9–59.1, 10 random calibration/evaluation splits), cap violated in **0/10** splits |
+| Observed miss / false alarm (seed 0) | 27 / 11,136 positives (0.24%) · 1,182 / 98,172 negatives (1.20%) |
+
+![Fig. 1](docs/figures/fig1_methods.png)
+
+*Fig. 1.* Automation at a 5% miss cap for every approach we tried (×N = inference cost relative to E1).
+Changing only the score rule (NMS → dense, same weights, same forward pass) gave the largest gain: 19.9% → 57.8%.
+Ensembles and a second classifier added at most +1.7 to +3.0 pp at 2–3× cost. The best of these (E1+cls-all, orange) was picked *after* seeing the results on an already re-used test set, so we report it as exploratory and do not adopt it.
+
+![Fig. 2](docs/figures/fig2_calibration.png)
+
+*Fig. 2.* Calibrating on the training distribution (A, B) exceeds the cap by up to 4× once deployed on the test distribution. Calibrating on test-like images with an upper confidence bound (D) holds the cap at every level.
+
+<p>
+<img src="docs/figures/fig3_detector_map.png" width="48%" alt="Fig. 3">
+<img src="docs/figures/fig4_review_rate.png" width="50%" alt="Fig. 4">
+</p>
+
+*Fig. 3.* Validation mAP@0.5 (0.978) overstates field performance. Hidden items fall to 0.25 (lighter) to 0.46 (knife).
+*Fig. 4.* NMS throws away the scores of items that lose to a neighbouring class. Keeping them (dense) gives every item a usable threshold.
+
+**Table 1.** Seed-0 evaluation half: 9,109 images × 12 items = 109,308 decisions (11,136 positive, 98,172 negative).
+
+| Score | Cap | Missed (of 11,136) | False alarm (of 98,172) | Review (of 109,308) | **Automated** |
+|---|---:|---:|---:|---:|---:|
+| NMS | 5% | 9 (0.08%) | 1,193 (1.22%) | 91,880 (84.06%) | 15.94% |
+| **dense** | **5%** | 27 (0.24%) | 1,182 (1.20%) | 46,910 (42.92%) | **57.08%** |
+| NMS | 2% | 0 | 1,675 (1.71%) | 97,751 (89.43%) | 10.57% |
+| dense | 2% | 0 | 1,828 (1.86%) | 97,589 (89.28%) | 10.72% |
+| dense | 1% | 0 | 1,893 (1.93%) | 97,516 (89.21%) | 10.79% |
+
+At 2% and 1% the hidden cells (100–260 positives) are too small to *certify* the cap with Bonferroni, so almost everything goes to review. More data is needed, not a better model.
+At the bag level (any item alarmed → open the bag), no bag containing a prohibited item was auto-cleared, and about 90% were alarmed directly.
+
+## Demo app
+
+The web app runs the E1 detector **inside the browser** (ONNX + onnxruntime-web, wasm). The photo never leaves the device.
+Upload an X-ray image and you get the bag verdict and 12 per-item zones. **Tap an item name to see where in the photo that item scores highest.**
+
+<p>
+<img src="docs/screenshots/result_knife_alarm.png" width="49%" alt="Knife: auto-alarm">
+<img src="docs/screenshots/result_gun_review.png" width="49%" alt="Gun: review">
+</p>
+
+*Screenshots from the live site. Left: knife highlighted (auto-alarm). Right: gun highlighted (review). The X-ray photos are pixelated because PIDray may not be redistributed; the boxes are the app's real output.*
+
+![Fig. 5](docs/figures/fig5_browser_parity.png)
+
+*Fig. 5.* Browser and server agree. Over 36 PIDray test images × 12 items, **0 zone flips**, max relative score difference 3.5% (scores ≥ 1e-3), boxes within 0.2 px, about 0.4 s per image.
+To get there, the browser reproduces Ultralytics letterboxing and OpenCV 5.1's two-pass bilinear resize exactly.
+
+Run it yourself: see [app/README.md](app/README.md) (browser build, Vercel deploy, or a local FastAPI server).
+Regenerate the figures with `python ml/scripts/make_figures.py` (numbers in `docs/figures/data/`, transcribed from [docs/results.md](docs/results.md)).
+
+## Limitations
+
+- **No untouched holdout.** PIDray's test set was reused across many experiments, so every number above is an exploratory estimate on PIDray, not a guarantee.
+- **Not validated on real airport equipment.** Thresholds come from the PIDray test distribution.
+- **Empty bags are not measured.** All PIDray images contain a prohibited item, so we cannot measure how often clean bags would be opened.
+- **The highlighted box is not a detection.** It is the anchor with the highest score for that item, so on an auto-cleared item it usually points at nothing.
+- **Weights and images are not in this repo.** PIDray is for academic use only and may not be redistributed. The demo site serves the ONNX weights for a temporary demo.
+
+## Repository
+
+| Path | What | Stack |
+|---|---|---|
+| `ml/` | data prep, zone calibration, experiments (E1–E5), figures | Python 3.11, Ultralytics |
+| `server/` | inspection API (`POST /v2/inspections`) | FastAPI |
+| `app/` | screener app, browser inference | Flutter web, onnxruntime-web |
+| `docs/` | plan, protocol, [results](docs/results.md), [decisions](docs/decisions.md) | — |
+
+---
+
+# 한국어
+
+## 한컷점검 (hancut-inspection)
+
+**배포: https://hancut-inspection.vercel.app** (브라우저 안 판정, 임시 시연용)
 
 > 보안검색 X-ray 사진을 **놓침률 상한 아래에서 자동통과 / 재검 / 자동적발** 세 구간으로 나눠,
 > 판독관이 직접 봐야 할 사진을 몇 %까지 줄일 수 있는지 정한다.
