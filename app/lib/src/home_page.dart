@@ -226,11 +226,14 @@ class _BoxPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final sx = size.width / image.width, sy = size.height / image.height;
     final r = Rect.fromLTRB(box.left * sx, box.top * sy, box.right * sx, box.bottom * sy).inflate(2);
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0x55000000));
-    canvas.save();
-    canvas.clipRect(r);
-    canvas.drawColor(const Color(0x00000000), BlendMode.clear);
-    canvas.restore();
+    // 박스 바깥만 어둡게 — 박스 안의 사진은 그대로 보이게 한다.
+    canvas.drawPath(
+      Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect(Offset.zero & size)
+        ..addRect(r),
+      Paint()..color = const Color(0x66000000),
+    );
     canvas.drawRRect(
       RRect.fromRectAndRadius(r, const Radius.circular(4)),
       Paint()
