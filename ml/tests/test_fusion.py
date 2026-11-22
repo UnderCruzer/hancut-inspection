@@ -56,3 +56,34 @@ def test_assign_swaps_only_the_named_items_and_rejects_unknown_names():
         fusion.assign(["Gun"], ["E1", "small"], {"Sword": "small"})
     with pytest.raises(ValueError, match="모르는 모델"):
         fusion.assign(["Gun"], ["E1", "small"], {"Gun": "big"})
+
+
+def test_add_keeps_the_first_model_and_adds_the_named_one():
+    assert fusion.add(["Gun", "Lighter"], ["E1", "cls"], {"Lighter": "cls"}) == {"Gun": ("E1",), "Lighter": ("E1", "cls")}
+    assert fusion.add(["Gun"], ["E1", "cls"], {"Gun": "E1"}) == {"Gun": ("E1",)}
+    with pytest.raises(ValueError, match="모르는 모델"):
+        fusion.add(["Gun"], ["E1", "cls"], {"Gun": "big"})
+
+
+def test_neg_z_puts_two_scales_on_the_calib_negatives_and_keeps_order():
+    # 같은 순서지만 척도가 다른 두 모델: a 는 음성이 1e-6 근처, b 는 0.3 근처
+    a = _model([("1", "Gun", 0, 1e-6), ("2", "Gun", 0, 4e-6), ("3", "Gun", 1, 0.5)])
+    b = _model([("1", "Gun", 0, 0.2), ("2", "Gun", 0, 0.4), ("3", "Gun", 1, 0.9)])
+    pa, pb = fusion.neg_z_params(a, ["Gun"])["Gun"], fusion.neg_z_params(b, ["Gun"])["Gun"]
+    # 맞춘 뒤에는 두 모델의 음성 평균이 모두 0.5 (z = 0) 에 온다
+    assert fusion.neg_z(2e-6, pa) == pytest.approx(0.5)
+    assert fusion.neg_z(0.2, pb) + fusion.neg_z(0.4, pb) == pytest.approx(1.0)  # 음성 둘이 z = ±1
+    vals = [fusion.neg_z(s, pa) for s in (1e-9, 1e-6, 0.5, 1.0)]
+    assert vals == sorted(vals) and all(0 <= v <= 1 for v in vals)
+    with pytest.raises(ValueError, match="모두 같아"):
+        fusion.neg_z_params(_model([("1", "Gun", 0, 0.1), ("2", "Gun", 0, 0.1)]), ["Gun"])
+    with pytest.raises(ValueError, match="둘 이상"):
+        fusion.neg_z_params(_model([("1", "Gun", 0, 0.1), ("2", "Gun", 1, 0.9)]), ["Gun"])
+
+
+def test_normalize_touches_only_items_that_mix_models():
+    a = _model([("1", "Gun", 0, 0.1), ("2", "Gun", 0, 0.3), ("1", "Knife", 0, 0.2)])
+    params = {"a": fusion.neg_z_params(a, ["Gun"])}
+    out = fusion.normalize({"a": a}, params, {"Gun": ("a", "b"), "Knife": ("a",)})
+    assert out["a"][("1", "Knife")] == (0, 0.2)
+    assert out["a"][("1", "Gun")][1] < 0.5 < out["a"][("2", "Gun")][1]
