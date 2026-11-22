@@ -23,12 +23,37 @@ enum JudgmentZone {
 
   bool get needsReview => this == JudgmentZone.review;
 
+  /// 사진 한 장의 판정에서 무엇을 먼저 보여줄지. 적발 > 재검 > 통과.
+  int get severity => switch (this) {
+        JudgmentZone.autoClear => 0,
+        JudgmentZone.review => 1,
+        JudgmentZone.autoAlarm => 2,
+      };
+
   Color get color => switch (this) {
         JudgmentZone.autoClear => const Color(0xFF2E8657),
         JudgmentZone.review => const Color(0xFFD98A1E),
         JudgmentZone.autoAlarm => const Color(0xFFD9432A),
       };
 }
+
+/// 서버 품목 이름(PIDray 클래스) → 화면에 보일 이름.
+const itemLabels = {
+  'Baton': '경봉',
+  'Pliers': '펜치',
+  'Hammer': '망치',
+  'Powerbank': '보조배터리',
+  'Scissors': '가위',
+  'Wrench': '렌치',
+  'Gun': '총기',
+  'Bullet': '탄약',
+  'Sprayer': '스프레이',
+  'HandCuffs': '수갑',
+  'Knife': '칼',
+  'Lighter': '라이터',
+};
+
+String itemLabel(String item) => itemLabels[item] ?? item;
 
 /// 서버 `POST /v1/inspections` 응답.
 class Judgment {
@@ -55,4 +80,63 @@ class Judgment {
       modelVersion: json['model_version'] as String? ?? 'unknown',
     );
   }
+}
+
+/// `POST /v2/inspections` 의 품목 하나.
+class ItemJudgment {
+  const ItemJudgment({required this.item, required this.score, required this.zone, required this.low, required this.high});
+
+  final String item;
+  final double score;
+  final JudgmentZone zone;
+  final double low;
+  final double high;
+
+  String get label => itemLabel(item);
+
+  factory ItemJudgment.fromJson(Map<String, dynamic> json) {
+    final thresholds = json['thresholds'] as Map<String, dynamic>? ?? const {};
+    return ItemJudgment(
+      item: json['item'] as String,
+      score: (json['score'] as num).toDouble(),
+      zone: JudgmentZone.parse(json['zone'] as String),
+      low: (thresholds['low'] as num?)?.toDouble() ?? double.nan,
+      high: (thresholds['high'] as num?)?.toDouble() ?? double.nan,
+    );
+  }
+}
+
+/// 사진 한 장의 판정 — 12종 품목별 구간과, 그중 가장 엄한 구간.
+class Inspection {
+  const Inspection({required this.items, required this.modelVersion, required this.experimental});
+
+  final List<ItemJudgment> items;
+  final String modelVersion;
+  final bool experimental;
+
+  factory Inspection.fromJson(Map<String, dynamic> json) {
+    final items = (json['items'] as List<dynamic>? ?? const [])
+        .map((e) => ItemJudgment.fromJson(e as Map<String, dynamic>))
+        .toList();
+    if (items.isEmpty) {
+      throw const FormatException('품목 판정이 비어 있다');
+    }
+    return Inspection(
+      items: items,
+      modelVersion: json['model_version'] as String? ?? 'unknown',
+      // 표시가 없으면 실험용으로 본다 — 보장된 결과처럼 보이지 않게 한다.
+      experimental: json['experimental'] as bool? ?? true,
+    );
+  }
+
+  /// 품목 하나라도 적발이면 적발, 재검이 있으면 재검, 모두 통과일 때만 통과.
+  JudgmentZone get overall => items.map((e) => e.zone).reduce((a, b) => a.severity >= b.severity ? a : b);
+
+  /// 엄한 구간 먼저, 같은 구간에서는 점수가 높은 품목 먼저.
+  List<ItemJudgment> get sorted => [...items]..sort((a, b) {
+      final bySeverity = b.zone.severity.compareTo(a.zone.severity);
+      return bySeverity != 0 ? bySeverity : b.score.compareTo(a.score);
+    });
+
+  List<ItemJudgment> inZone(JudgmentZone zone) => sorted.where((e) => e.zone == zone).toList();
 }
