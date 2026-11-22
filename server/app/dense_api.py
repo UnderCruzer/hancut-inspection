@@ -21,10 +21,12 @@ class ItemResult(BaseModel):
     zone: str
     needs_review: bool
     thresholds: dict[str, float]
+    box: list[float] | None = None  # 가장 의심되는 자리 (원본 좌표 x1, y1, x2, y2) — 검출 결과가 아니다
 
 
 class DenseResponse(BaseModel):
     items: list[ItemResult]
+    image_size: list[int] | None = None  # 너비, 높이
     score_method: str = SCORE_METHOD
     model_version: str
     bundle_sha256: str
@@ -69,7 +71,8 @@ def inspect(request: Request, image: UploadFile = File(...)):
         raise HTTPException(400, "손상되었거나 읽을 수 없는 이미지다") from None
 
     try:
-        scores = predictor.predict(payload)
+        detail = getattr(predictor, "predict_detail", None)
+        scores, boxes, size = detail(payload) if detail else (predictor.predict(payload), {}, None)
         bundle = predictor.bundle
         if set(scores) != set(bundle.names):
             raise ValueError("dense 출력 품목 누락 또는 추가")
@@ -80,8 +83,10 @@ def inspect(request: Request, image: UploadFile = File(...)):
             zone = judgment.zone_of(score, table)
             items.append(ItemResult(item=name, score=score, zone=zone,
                                     needs_review=judgment.needs_review(zone),
-                                    thresholds={"low": table.low, "high": table.high}))
-        return DenseResponse(items=items, model_version=f"sha256:{bundle.weights_sha256}",
+                                    thresholds={"low": table.low, "high": table.high},
+                                    box=boxes.get(name)))
+        return DenseResponse(items=items, image_size=list(size) if size else None,
+                             model_version=f"sha256:{bundle.weights_sha256}",
                              bundle_sha256=bundle.bundle_sha256)
     except Exception:
         logger.exception("dense 추론 실패")

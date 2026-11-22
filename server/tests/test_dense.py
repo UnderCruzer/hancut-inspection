@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.dense import DenseBundle, DensePredictor, PREPROCESS, SCORE_METHOD, ULTRALYTICS_VERSION
+from app.dense import DenseBundle, DensePredictor, PREPROCESS, SCORE_METHOD, ULTRALYTICS_VERSION, to_original
 from app.main import create_app
 
 NAMES = tuple(x["dataset_name"] for x in json.loads(
@@ -158,3 +158,30 @@ def test_failed_startup_serves_503(tmp_path, monkeypatch):
     with TestClient(create_app(thresholds_path=tmp_path / "absent.json")) as client:
         assert upload(client).status_code == 503
         assert client.get("/v2/health").json()["model_loaded"] is False
+
+
+class FakeDetail(FakeDense):
+    def predict_detail(self, payload):
+        self.calls += 1
+        return self.scores, {n: [1.0, 2.0, 3.0, 4.0] for n in self.bundle.names}, (16, 8)
+
+
+def test_returns_boxes_and_size_when_the_model_locates(tmp_path):
+    predictor = FakeDetail(load_bundle(tmp_path))
+    with TestClient(create_app(dense_predictor=predictor, thresholds_path=tmp_path / "absent.json")) as client:
+        body = upload(client).json()
+    assert body["image_size"] == [16, 8]
+    assert all(i["box"] == [1.0, 2.0, 3.0, 4.0] for i in body["items"])
+
+
+def test_boxes_are_optional(service):
+    _, _, client = service
+    body = upload(client).json()
+    assert body["image_size"] is None and all(i["box"] is None for i in body["items"])
+
+
+def test_letterbox_box_maps_back_to_original():
+    # 1280x448 -> r=0.5, 640x224, 위아래 여백 208
+    assert to_original([320.0, 320.0, 100.0, 50.0], 1280, 448, 640) == [540.0, 174.0, 740.0, 274.0]
+    # 박스가 여백으로 넘치면 사진 안으로 자른다
+    assert to_original([5.0, 210.0, 20.0, 10.0], 1280, 448, 640) == [0.0, 0.0, 30.0, 14.0]
