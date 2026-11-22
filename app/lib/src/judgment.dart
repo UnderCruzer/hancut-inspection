@@ -15,26 +15,23 @@ enum JudgmentZone {
 
   /// 모르는 값이 오면 조용히 넘기지 않고 '재검'으로 보낸다 — 사람이 보게 한다.
   static JudgmentZone parse(String value) {
-    return JudgmentZone.values.firstWhere(
-      (zone) => zone.wireName == value,
-      orElse: () => JudgmentZone.review,
-    );
+    return JudgmentZone.values.firstWhere((zone) => zone.wireName == value, orElse: () => JudgmentZone.review);
   }
 
   bool get needsReview => this == JudgmentZone.review;
 
   /// 사진 한 장의 판정에서 무엇을 먼저 보여줄지. 적발 > 재검 > 통과.
   int get severity => switch (this) {
-        JudgmentZone.autoClear => 0,
-        JudgmentZone.review => 1,
-        JudgmentZone.autoAlarm => 2,
-      };
+    JudgmentZone.autoClear => 0,
+    JudgmentZone.review => 1,
+    JudgmentZone.autoAlarm => 2,
+  };
 
   Color get color => switch (this) {
-        JudgmentZone.autoClear => const Color(0xFF2E8657),
-        JudgmentZone.review => const Color(0xFFD98A1E),
-        JudgmentZone.autoAlarm => const Color(0xFFD9432A),
-      };
+    JudgmentZone.autoClear => const Color(0xFF2E8657),
+    JudgmentZone.review => const Color(0xFFD98A1E),
+    JudgmentZone.autoAlarm => const Color(0xFFD9432A),
+  };
 }
 
 /// 서버 품목 이름(PIDray 클래스) → 화면에 보일 이름.
@@ -84,13 +81,23 @@ class Judgment {
 
 /// `POST /v2/inspections` 의 품목 하나.
 class ItemJudgment {
-  const ItemJudgment({required this.item, required this.score, required this.zone, required this.low, required this.high});
+  const ItemJudgment({
+    required this.item,
+    required this.score,
+    required this.zone,
+    required this.low,
+    required this.high,
+    this.box,
+  });
 
   final String item;
   final double score;
   final JudgmentZone zone;
   final double low;
   final double high;
+
+  /// 그 품목 점수가 가장 높은 자리 (원본 사진 좌표 x1, y1, x2, y2). 검출 결과가 아니라 '가장 의심되는 곳'이다.
+  final Rect? box;
 
   String get label => itemLabel(item);
 
@@ -102,15 +109,25 @@ class ItemJudgment {
       zone: JudgmentZone.parse(json['zone'] as String),
       low: (thresholds['low'] as num?)?.toDouble() ?? double.nan,
       high: (thresholds['high'] as num?)?.toDouble() ?? double.nan,
+      box: _rect(json['box']),
     );
   }
 }
 
+Rect? _rect(Object? raw) {
+  if (raw is! List || raw.length != 4) return null;
+  final v = raw.map((e) => (e as num).toDouble()).toList();
+  return v[2] > v[0] && v[3] > v[1] ? Rect.fromLTRB(v[0], v[1], v[2], v[3]) : null;
+}
+
 /// 사진 한 장의 판정 — 12종 품목별 구간과, 그중 가장 엄한 구간.
 class Inspection {
-  const Inspection({required this.items, required this.modelVersion, required this.experimental});
+  const Inspection({required this.items, required this.modelVersion, required this.experimental, this.imageSize});
 
   final List<ItemJudgment> items;
+
+  /// 박스 좌표의 기준이 되는 원본 사진 크기.
+  final Size? imageSize;
   final String modelVersion;
   final bool experimental;
 
@@ -126,6 +143,10 @@ class Inspection {
       modelVersion: json['model_version'] as String? ?? 'unknown',
       // 표시가 없으면 실험용으로 본다 — 보장된 결과처럼 보이지 않게 한다.
       experimental: json['experimental'] as bool? ?? true,
+      imageSize: switch (json['image_size']) {
+        [num w, num h] when w > 0 && h > 0 => Size(w.toDouble(), h.toDouble()),
+        _ => null,
+      },
     );
   }
 
@@ -133,7 +154,8 @@ class Inspection {
   JudgmentZone get overall => items.map((e) => e.zone).reduce((a, b) => a.severity >= b.severity ? a : b);
 
   /// 엄한 구간 먼저, 같은 구간에서는 점수가 높은 품목 먼저.
-  List<ItemJudgment> get sorted => [...items]..sort((a, b) {
+  List<ItemJudgment> get sorted => [...items]
+    ..sort((a, b) {
       final bySeverity = b.zone.severity.compareTo(a.zone.severity);
       return bySeverity != 0 ? bySeverity : b.score.compareTo(a.score);
     });

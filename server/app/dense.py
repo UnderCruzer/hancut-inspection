@@ -15,6 +15,16 @@ PREPROCESS = "letterbox_square_bgr_to_rgb_float32_v1"
 ULTRALYTICS_VERSION = "8.4.164"
 
 
+def to_original(box: list[float], width: int, height: int, size: int) -> list[float]:
+    """letterbox 정사각 좌표의 (cx, cy, w, h) 를 원본 사진의 (x1, y1, x2, y2) 로. LetterBox 와 같은 여백 규칙."""
+    r = min(size / height, size / width)
+    left, top = round((size - round(width * r)) / 2 - 0.1), round((size - round(height * r)) / 2 - 0.1)
+    cx, cy, w, h = box
+    x1, y1 = (cx - w / 2 - left) / r, (cy - h / 2 - top) / r
+    x2, y2 = (cx + w / 2 - left) / r, (cy + h / 2 - top) / r
+    return [round(min(max(v, 0.0), lim), 1) for v, lim in ((x1, width), (y1, height), (x2, width), (y2, height))]
+
+
 def sha256(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
@@ -81,6 +91,13 @@ class DensePredictor:
         self.lock = Lock()
 
     def predict(self, image_bytes: bytes) -> dict[str, float]:
+        return self.predict_detail(image_bytes)[0]
+
+    def predict_detail(self, image_bytes: bytes) -> tuple[dict[str, float], dict[str, list[float]], tuple[int, int]]:
+        """
+        점수와 함께 품목마다 점수가 가장 높은 앵커의 박스(원본 사진 좌표 x1, y1, x2, y2)와 사진 크기(너비, 높이).
+        박스는 '가장 의심되는 자리'일 뿐 검출 결과가 아니다 — 점수가 낮으면 물건이 없는 곳이다.
+        """
         import cv2
         import numpy as np
         import torch
@@ -88,6 +105,7 @@ class DensePredictor:
         img = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError("이미지를 디코딩하지 못했다")
+        height, width = img.shape[:2]
         img = self.letterbox(image=img)
         chw = np.ascontiguousarray(img[..., ::-1].transpose(2, 0, 1))
         with self.lock, torch.no_grad():
@@ -99,6 +117,10 @@ class DensePredictor:
             values = raw[:, 4:, :]
             if not torch.isfinite(values).all() or (values < 0).any() or (values > 1).any():
                 raise ValueError("잘못된 dense 점수")
-            maxima = values.amax(dim=2).cpu().tolist()[0]
+            best, where = values.max(dim=2)
+            maxima = best.cpu().tolist()[0]
+            boxes = raw[0, :4, :].T[where[0]].cpu().tolist()
         # 보정 CSV의 .9g 표현과 같은 경계값을 사용한다. 1e-8 같은 값도 보존된다.
-        return {name: float(format(score, ".9g")) for name, score in zip(self.bundle.names, maxima)}
+        scores = {name: float(format(score, ".9g")) for name, score in zip(self.bundle.names, maxima)}
+        return scores, {name: to_original(box, width, height, self.bundle.imgsz)
+                        for name, box in zip(self.bundle.names, boxes)}, (width, height)

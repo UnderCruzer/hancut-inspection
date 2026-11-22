@@ -27,22 +27,45 @@ String? sniffImageType(Uint8List bytes) {
   return null;
 }
 
-class InspectionClient {
+/// 사진 한 장을 판정하는 방법 — 판정 서버(`InspectionClient`) 또는 브라우저 안(`BrowserInspector`).
+abstract class Inspector {
+  String get description;
+
+  /// 모델을 미리 준비한다. 서버는 할 일이 없다.
+  Future<void> warmup();
+
+  Future<Inspection> inspect(Uint8List bytes, {String filename = 'xray'});
+}
+
+class InspectionClient implements Inspector {
   InspectionClient(this.baseUrl, {http.Client? client}) : _client = client ?? http.Client();
+
+  @override
+  String get description => '판정 서버 $baseUrl';
+
+  @override
+  Future<void> warmup() async {}
 
   final String baseUrl;
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse(baseUrl.replaceAll(RegExp(r'/+$'), '') + path);
 
+  @override
   Future<Inspection> inspect(Uint8List bytes, {String filename = 'xray'}) async {
     final type = sniffImageType(bytes);
     if (type == null) {
       throw const InspectionError('JPEG 또는 PNG 사진만 판정할 수 있어요.');
     }
     final request = http.MultipartRequest('POST', _uri('/v2/inspections'))
-      ..files.add(http.MultipartFile.fromBytes('image', bytes,
-          filename: '$filename.${type == 'png' ? 'png' : 'jpg'}', contentType: MediaType('image', type)));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: '$filename.${type == 'png' ? 'png' : 'jpg'}',
+          contentType: MediaType('image', type),
+        ),
+      );
     final http.Response response;
     try {
       response = await http.Response.fromStream(await _client.send(request)).timeout(const Duration(seconds: 60));

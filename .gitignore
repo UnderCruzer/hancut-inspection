@@ -52,3 +52,6 @@ app/.flutter-plugins-dependencies
 
 # 시연용 PIDray 사진 — 학술 한정·재배포 금지라 커밋하지 않는다 (#60)
 /demo/
+
+# 브라우저 판정용 ONNX 가중치 — 배포에만 싣고 커밋하지 않는다 (#62)
+app/web/models/*.onnx
