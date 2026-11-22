@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hancut/main.dart';
+import 'package:hancut/src/api.dart';
+import 'package:hancut/src/home_page.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:hancut/src/judgment.dart';
 
 void main() {
@@ -52,15 +58,103 @@ void main() {
     });
   });
 
-  testWidgets('홈 화면에 세 구간과 판독 시작 버튼이 보인다', (tester) async {
-    await tester.pumpWidget(const HancutApp());
+  group('Inspection', () {
+    Map<String, dynamic> item(String name, double score, String zone) =>
+        {'item': name, 'score': score, 'zone': zone, 'needs_review': zone == 'review', 'thresholds': {'low': 0.1, 'high': 0.9}};
 
-    expect(find.text('한컷점검'), findsOneWidget);
-    expect(find.text('통과'), findsOneWidget);
-    expect(find.text('재검'), findsOneWidget);
-    expect(find.text('적발'), findsOneWidget);
+    test('품목 하나라도 적발이면 사진도 적발', () {
+      final r = Inspection.fromJson({'items': [item('Knife', 0.05, 'auto_clear'), item('Gun', 0.95, 'auto_alarm'), item('Lighter', 0.4, 'review')], 'model_version': 'e1'});
+      expect(r.overall, JudgmentZone.autoAlarm);
+      expect(r.sorted.map((e) => e.item), ['Gun', 'Lighter', 'Knife']);
+      expect(r.inZone(JudgmentZone.review).single.label, '라이터');
+    });
 
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNull, reason: '촬영 화면은 W9에 붙인다');
+    test('재검이 있으면 재검, 모두 통과일 때만 통과', () {
+      expect(Inspection.fromJson({'items': [item('Knife', 0.05, 'auto_clear'), item('Lighter', 0.4, 'review')]}).overall, JudgmentZone.review);
+      expect(Inspection.fromJson({'items': [item('Knife', 0.05, 'auto_clear')]}).overall, JudgmentZone.autoClear);
+    });
+
+    test('실험 표시가 없으면 실험용으로 본다', () {
+      expect(Inspection.fromJson({'items': [item('Knife', 0.05, 'auto_clear')]}).experimental, isTrue);
+    });
+
+    test('빈 판정은 받지 않는다', () {
+      expect(() => Inspection.fromJson({'items': []}), throwsFormatException);
+    });
+  });
+
+  group('InspectionClient', () {
+    final png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0]);
+    final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 0, 0]);
+
+    test('확장자 대신 내용으로 형식을 정한다', () {
+      expect(sniffImageType(png), 'png');
+      expect(sniffImageType(jpeg), 'jpeg');
+      expect(sniffImageType(Uint8List.fromList([1, 2, 3])), isNull);
+    });
+
+    test('v2 판정을 보내고 읽는다', () async {
+      late http.BaseRequest sent;
+      final client = InspectionClient('http://server/', client: MockClient((request) async {
+        sent = request;
+        return http.Response.bytes(utf8.encode(jsonEncode({
+          'items': [{'item': 'Gun', 'score': 0.97, 'zone': 'auto_alarm', 'thresholds': {'low': 0.01, 'high': 0.6}}],
+          'model_version': 'e1', 'experimental': true,
+        })), 200, headers: {'content-type': 'application/json'});
+      }));
+      final r = await client.inspect(jpeg);
+      expect(sent.url.toString(), 'http://server/v2/inspections');
+      expect(r.overall, JudgmentZone.autoAlarm);
+      expect(r.items.single.label, '총기');
+    });
+
+    test('서버 오류를 한국어 문장으로 바꾼다', () async {
+      final client = InspectionClient('http://server', client: MockClient((_) async => http.Response('{}', 503)));
+      await expectLater(client.inspect(png), throwsA(isA<InspectionError>().having((e) => e.message, 'message', contains('준비'))));
+    });
+
+    test('사진이 아니면 보내지 않는다', () async {
+      var called = false;
+      final client = InspectionClient('http://server', client: MockClient((_) async { called = true; return http.Response('{}', 200); }));
+      await expectLater(client.inspect(Uint8List.fromList([1, 2, 3])), throwsA(isA<InspectionError>()));
+      expect(called, isFalse);
+    });
+  });
+
+  test('막대는 로그 눈금, 작은 점수는 지수로 쓴다', () {
+    expect(scorePosition(1), 1);
+    expect(scorePosition(1e-6), closeTo(0, 1e-9));
+    expect(scorePosition(1e-3), closeTo(0.5, 1e-9));
+    expect(scorePosition(0), 0);
+    expect(formatScore(0.4071), '0.407');
+    expect(formatScore(0.00004), '4e-5');
+    expect(shortVersion('sha256:2d41d3d38914c27f5275'), 'sha256:2d41d3d38914');
+  });
+
+  testWidgets('사진을 고르면 사진 판정과 품목별 구간을 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final image = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 0, 0]);
+    await tester.pumpWidget(MaterialApp(
+      home: HomePage(
+        pickImage: () async => (image, 'bag.jpg'),
+        clientFor: (url) => InspectionClient(url, client: MockClient((_) async => http.Response.bytes(utf8.encode(jsonEncode({
+              'items': [
+                {'item': 'Lighter', 'score': 0.42, 'zone': 'review', 'thresholds': {'low': 0.1, 'high': 0.9}},
+                {'item': 'Knife', 'score': 0.01, 'zone': 'auto_clear', 'thresholds': {'low': 0.1, 'high': 0.9}},
+              ],
+              'model_version': 'e1',
+            })), 200))),
+      ),
+    ));
+    expect(find.text('재검'), findsOneWidget, reason: '처음에는 구간 안내만 보인다');
+
+    await tester.tap(find.text('X-ray 사진 판정하기'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('overall'))).data, '재검');
+    expect(find.text('판독관 확인 필요: 라이터'), findsOneWidget);
+    expect(find.text('칼'), findsOneWidget);
   });
 }

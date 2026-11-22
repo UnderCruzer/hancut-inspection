@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app import judgment
@@ -83,7 +84,7 @@ async def judge(request: Request, image: UploadFile = File(...)) -> JudgmentResp
 
 
 def create_app(predictor: Predictor | None = None, thresholds_path: Path | None = None,
-               *, dense_predictor=None) -> FastAPI:
+               *, dense_predictor=None, cors_origins: str | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
         if app.state.dense_predictor is None:
@@ -105,6 +106,11 @@ def create_app(predictor: Predictor | None = None, thresholds_path: Path | None 
 
     path = thresholds_path or Path(os.getenv("THRESHOLDS_PATH", "models/thresholds.json"))
     app.state.thresholds = judgment.load_thresholds(path) if path.exists() else None
+
+    # 웹 앱 시연용. 허용 출처는 환경 변수로만 열고, 비어 있으면 CORS 를 붙이지 않는다.
+    origins = [o.strip() for o in (cors_origins if cors_origins is not None else os.getenv("CORS_ORIGINS", "")).split(",") if o.strip()]
+    if origins:
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["*"])
 
     app.include_router(router)
     app.include_router(dense_api.router)

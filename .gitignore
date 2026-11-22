@@ -37,6 +37,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+.venv-*/
 *.egg-info/
 
 # Flutter
@@ -48,3 +49,6 @@ app/.flutter-plugins-dependencies
 # 기타
 .DS_Store
 *.log
+
+# 시연용 PIDray 사진 — 학술 한정·재배포 금지라 커밋하지 않는다 (#60)
+/demo/

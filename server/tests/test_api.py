@@ -122,3 +122,18 @@ class TestThresholds:
     def test_rejects_score_outside_range(self):
         with pytest.raises(ValueError):
             judgment.zone_of(1.2, judgment.Thresholds(low=0.2, high=0.8))
+
+
+def test_cors_is_off_unless_origins_are_given(tmp_path):
+    with TestClient(create_app(thresholds_path=tmp_path / "absent.json", cors_origins="")) as client:
+        r = client.get("/health", headers={"Origin": "http://localhost:5555"})
+    assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_allows_only_listed_origins(tmp_path):
+    app = create_app(thresholds_path=tmp_path / "absent.json", cors_origins="http://localhost:5555")
+    with TestClient(app) as client:
+        ok = client.options("/v2/inspections", headers={"Origin": "http://localhost:5555", "Access-Control-Request-Method": "POST"})
+        other = client.get("/health", headers={"Origin": "http://evil.example"})
+    assert ok.headers["access-control-allow-origin"] == "http://localhost:5555"
+    assert "access-control-allow-origin" not in other.headers

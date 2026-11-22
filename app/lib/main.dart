@@ -13,6 +13,7 @@ class HancutApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '한컷점검',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD9432A)),
         useMaterial3: true,
